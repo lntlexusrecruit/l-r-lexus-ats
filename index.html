@@ -517,6 +517,26 @@ async function submitApplication() {
   if(!error) { applicationId = appId; await saveSubtables(); }
   hideLoading();
   if(error){showToast('⚠️ 제출 실패: '+error.message);return;}
+
+  // 담당 관리자에게 이메일 알림 발송
+  try {
+    await fetch('https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/notify-new-applicant', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss'
+      },
+      body: JSON.stringify({
+        application_id: appId,
+        job_posting_id: jobPostingId,
+        applicant_name: fd.basic.name || currentUser.email,
+        job_title: jobTitle
+      })
+    });
+  } catch(e) {
+    console.log('이메일 알림 발송 실패:', e);
+  }
+
   showComplete(submissionNumber);
 }
 
