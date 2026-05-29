@@ -837,7 +837,7 @@ async function loadAdmins() {
 function openAdminForm() {
   ['aName','aEmail','aPw','aDept'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('aRole').value='manager';
-  document.getElementById('aJobPerms').innerHTML=allJobs.map(j=>`<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:6px;border:0.5px solid var(--border);border-radius:var(--rxs)"><input type="checkbox" value="${j.id}"> ${j.title}</label>`).join('');
+  document.getElementById('aJobPerms').innerHTML=allJobs.map(j=>`<label style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--rxs);cursor:pointer;font-size:13px;transition:background .12s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''"><input type="checkbox" value="${j.id}" style="width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:var(--accent)"><div style="flex:1;min-width:0"><div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j.title}</div><div style="font-size:11px;color:var(--text3);margin-top:1px">${j.department||''} · ${j.is_active?'<span style=\'color:var(--g600)\'>모집중</span>':'마감'}</div></div></label>`).join('');
   document.getElementById('adminFormErr').classList.add('hidden');
   document.getElementById('adminFormModal').classList.remove('hidden');
 }
@@ -878,11 +878,11 @@ async function openAdminEdit(adminId) {
   const {data:currentPerms} = await sb.from('admin_job_permissions').select('job_posting_id').eq('admin_id', adminId);
   const currentIds = (currentPerms||[]).map(p => p.job_posting_id);
   document.getElementById('eJobPerms').innerHTML = allJobs.map(j => `
-    <label style="display:flex;align-items:center;gap:10px;padding:10px;border:0.5px solid var(--border);border-radius:var(--rxs);cursor:pointer;font-size:13px">
-      <input type="checkbox" value="${j.id}" ${currentIds.includes(j.id)?'checked':''}>
-      <div>
-        <div style="font-weight:500">${j.title}</div>
-        <div style="font-size:11px;color:var(--text3)">${j.department||''} · ${j.is_active?'모집중':'마감'}</div>
+    <label style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--rxs);cursor:pointer;font-size:13px;transition:background .12s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <input type="checkbox" value="${j.id}" ${currentIds.includes(j.id)?'checked':''} style="width:16px;height:16px;flex-shrink:0;cursor:pointer;accent-color:var(--accent)">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${j.title}</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">${j.department||''} · ${j.is_active?'<span style=\'color:var(--g600)\'>모집중</span>':'마감'}</div>
       </div>
     </label>
   `).join('');
@@ -902,7 +902,9 @@ async function saveAdminEdit() {
   if (role === 'manager' && checked.length) {
     await sb.from('admin_job_permissions').insert(checked.map(jid=>({admin_id:editAdminId,job_posting_id:jid,granted_by:currentAdmin.id})));
   }
-  closeAdminEdit(); await loadAdmins(); showToast('✓ 관리자 정보 수정 완료');
+  closeAdminEdit(); 
+  await loadAdmins();
+  showToast('✓ 관리자 정보 수정 완료');
 }
 
 async function toggleAdminActive(id, name, isActive) {
