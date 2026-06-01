@@ -450,13 +450,12 @@ async function doSignup() {
   });
   hideLoading();
   if(error){showErr(err, error.message==='User already registered'?'이미 가입된 이메일입니다':error.message);return;}
-  // 이메일 인증 안내 화면으로 이동
-  document.getElementById('viewAuth').classList.add('hidden');
-  document.getElementById('viewVerify').classList.remove('hidden');
-  document.getElementById('verifyEmailAddr').textContent = email;
-  // 이름/이메일 임시 저장
-  window._pendingName = name;
-  window._pendingEmail = email;
+  currentUser = data.user;
+  fd.basic.name = name;
+  fd.basic.email = email;
+  // applicant_profiles 생성
+  await sb.from('applicant_profiles').upsert({ id: currentUser.id, email, name });
+  showForm();
 }
 
 async function doLogin() {
@@ -470,17 +469,6 @@ async function doLogin() {
   if(error){showErr(err,'이메일 또는 비밀번호가 올바르지 않습니다');return;}
   currentUser = data.user;
   fd.basic.email = email;
-  
-  // 이메일 인증 확인
-  if (!data.user.email_confirmed_at) {
-    document.getElementById('viewAuth').classList.add('hidden');
-    document.getElementById('viewVerify').classList.remove('hidden');
-    document.getElementById('verifyEmailAddr').textContent = email;
-    window._pendingEmail = email;
-    showToast('이메일 인증 후 로그인해주세요');
-    await sb.auth.signOut();
-    return;
-  }
   
   showForm();
 }
@@ -538,6 +526,7 @@ async function showForm() {
 // ── 임시저장 ─────────────────────────────────────────────
 async function saveDraft() {
   collectStep();
+  collectAllSteps();
   showLoading('임시저장 중...');
   const payload = buildPayload(true);
   let error;
@@ -557,7 +546,10 @@ async function saveDraft() {
 
 // ── 제출 ─────────────────────────────────────────────────
 async function submitApplication() {
+  // 현재 단계 수집
   collectStep();
+  // 모든 단계 데이터 강제 수집
+  collectAllSteps();
   if(!fd.basic.name){showToast('이름을 입력해주세요 (1단계)');return;}
   showLoading('지원서 제출 중...');
   const submissionNumber = 'HF-' + new Date().getFullYear() + '-' + Math.floor(Math.random()*90000+10000);
@@ -617,10 +609,10 @@ function buildPayload(isDraft) {
     work_type: fd.basic.workType||null,
     apply_source: fd.basic.source||[],
     skills: skills,
-    essay_motivation: fd.essay.q1||null,
-    essay_experience: fd.essay.q2||null,
-    essay_strength: fd.essay.q3||null,
-    essay_goal: fd.essay.q4||null,
+    essay_motivation: fd.essay.q1||null,   // 성장과정
+    essay_experience: fd.essay.q3||null,  // 지원동기
+    essay_strength: fd.essay.q2||null,    // 성격장단점
+    essay_goal: fd.essay.q4||null,        // 목표및포부
     link_github: fd.extra?.github||null,
     link_linkedin: fd.extra?.linkedin||null,
     link_blog: fd.extra?.blog||null,
@@ -845,10 +837,10 @@ function mkLangEntry(l,i){const d=mk('entry-block');d.id='lang'+i;d.innerHTML=`<
 function buildEssay(){
   const w=document.createElement('div');
   const qs=[
-    {k:'q1',t:'성장 과정 및 지원 동기',h:'지원자님의 성장 과정과 이 직무에 지원하게 된 동기를 구체적으로 작성해 주세요.',lim:1000},
-    {k:'q2',t:'직무 관련 경험과 역량',h:'지원 직무와 관련하여 본인의 핵심 경험과 역량을 작성해 주세요.',lim:1000},
-    {k:'q3',t:'장단점 및 극복 경험',h:'본인의 장점과 단점을 솔직하게 작성하고, 단점을 극복하기 위해 노력한 경험을 적어 주세요.',lim:800},
-    {k:'q4',t:'입사 후 목표 및 포부',h:'입사 후 단기 및 장기 목표, 이 회사에서 이루고 싶은 것을 작성해 주세요.',lim:800},
+    {k:'q1',t:'성장과정',h:'지원자님의 성장 과정을 구체적으로 작성해 주세요.',lim:1000},
+    {k:'q2',t:'성격의 장단점',h:'본인의 장점과 단점을 솔직하게 작성해 주세요.',lim:800},
+    {k:'q3',t:'지원동기',h:'이 직무와 회사에 지원하게 된 동기를 구체적으로 작성해 주세요.',lim:1000},
+    {k:'q4',t:'입사 후 목표 및 포부',h:'입사 후 단기 및 장기 목표, 이루고 싶은 것을 작성해 주세요.',lim:800},
   ];
   qs.forEach(q=>{
     const c=mk('form-card');
@@ -863,6 +855,56 @@ function buildEssay(){
 function updCnt(k,lim,v){document.getElementById('cnt_'+k).textContent=v.length+' / '+lim+'자';}
 
 // ── 데이터 수집 ──────────────────────────────────────────
+function collectAllSteps(){
+  // 학력 데이터 수집
+  document.querySelectorAll('[data-ei]').forEach(el=>{
+    const i=el.dataset.ei,k=el.dataset.k;
+    if(!fd.education[i])fd.education[i]={};
+    fd.education[i][k]=el.value;
+  });
+  // 경력 데이터 수집
+  const noExpCb = document.getElementById('noExpCb');
+  if(!noExpCb?.checked){
+    document.querySelectorAll('[data-ci]').forEach(el=>{
+      const i=el.dataset.ci,k=el.dataset.k;
+      if(!fd.career[i])fd.career[i]={};
+      fd.career[i][k]=el.value;
+    });
+    fd.career.forEach((c,i)=>{
+      const cb=document.querySelector(`#curLbl${i} input`);
+      if(cb)c.current=cb.checked;
+    });
+  }
+  // 자격증
+  document.querySelectorAll('[data-ci2]').forEach(el=>{
+    const i=el.dataset.ci2,k=el.dataset.k;
+    if(!fd.extra.certs[i])fd.extra.certs[i]={};
+    fd.extra.certs[i][k]=el.value;
+  });
+  // 수상
+  document.querySelectorAll('[data-ai]').forEach(el=>{
+    const i=el.dataset.ai,k=el.dataset.k;
+    if(!fd.extra.awards[i])fd.extra.awards[i]={};
+    fd.extra.awards[i][k]=el.value;
+  });
+  // 어학
+  document.querySelectorAll('[data-li]').forEach(el=>{
+    const i=el.dataset.li,k=el.dataset.k;
+    if(!fd.extra.langs[i])fd.extra.langs[i]={};
+    fd.extra.langs[i][k]=el.value;
+  });
+  // 링크
+  const gh=document.getElementById('f_gh');if(gh)fd.extra.github=gh.value;
+  const li=document.getElementById('f_li');if(li)fd.extra.linkedin=li.value;
+  const bl=document.getElementById('f_bl');if(bl)fd.extra.blog=bl.value;
+  const pf=document.getElementById('f_pf');if(pf)fd.extra.portfolio=pf.value;
+  // 자기소개서
+  ['q1','q2','q3','q4'].forEach(k=>{
+    const el=document.getElementById('ess_'+k);
+    if(el)fd.essay[k]=el.value;
+  });
+}
+
 function collectStep(){
   if(currentStep===0){
     fd.basic={name:g('f_name'),nameEn:g('f_nameEn'),birth:g('f_birth'),gender:g('f_gender'),nation:g('f_nation'),email:g('f_email'),phone:g('f_phone'),addr:g('f_addr'),salary:g('f_salary'),startDate:g('f_startDate')};
