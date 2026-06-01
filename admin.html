@@ -853,17 +853,37 @@ async function saveAdmin() {
   err.classList.add('hidden');
   if(!name||!email||!pw){showErr(err,'이름, 이메일, 비밀번호를 입력하세요');return;}
   if(pw.length<8){showErr(err,'비밀번호는 8자 이상이어야 합니다');return;}
-  const {data:signData,error:signErr}=await sb.auth.signUp({email,password:pw,options:{data:{name}}});
-  if(signErr&&signErr.message!=='User already registered'){showErr(err,'오류: '+signErr.message);return;}
-  const uid=signData?.user?.id;
-  if(uid){
-    await sb.from('admin_profiles').upsert({id:uid,email,name,role,department:dept||null,is_active:true});
-    const checked=Array.from(document.querySelectorAll('#aJobPerms input:checked')).map(c=>c.value);
-    if(role==='manager'&&checked.length){
-      await sb.from('admin_job_permissions').insert(checked.map(jid=>({admin_id:uid,job_posting_id:jid,granted_by:currentAdmin.id})));
+
+  // Edge Function으로 이메일 인증 없이 계정 생성
+  const res = await fetch('https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/create-admin', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss',
+      'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss'
+    },
+    body: JSON.stringify({ email, password: pw, name, department: dept||null, role })
+  });
+
+  const result = await res.json();
+  if (!res.ok || result.error) {
+    showErr(err, result.error || '관리자 추가 실패');
+    return;
+  }
+
+  // 공고 권한 부여
+  if (role === 'manager' && result.id) {
+    const checked = Array.from(document.querySelectorAll('#aJobPerms input:checked')).map(c => c.value);
+    if (checked.length) {
+      await sb.from('admin_job_permissions').insert(
+        checked.map(jid => ({ admin_id: result.id, job_posting_id: jid, granted_by: currentAdmin.id }))
+      );
     }
   }
-  closeAdminForm(); await loadAdmins(); showToast('✓ 관리자 추가 완료. 이메일 인증 후 로그인 가능합니다.');
+
+  closeAdminForm();
+  await loadAdmins();
+  showToast('✓ 관리자 추가 완료! 바로 로그인 가능합니다.');
 }
 
 // 관리자 수정
