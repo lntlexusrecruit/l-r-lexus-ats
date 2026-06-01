@@ -936,12 +936,15 @@ async function saveAdmin() {
   if(pw.length<8){showErr(err,'비밀번호는 8자 이상이어야 합니다');return;}
 
   // Edge Function으로 이메일 인증 없이 계정 생성
-  const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss';
-  const reqBody = JSON.stringify({ email: email, password: pw, name: name, department: dept||null, role: role });
-  const res = await fetch('https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/create-admin', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss' },
-    body: reqBody
+  const res = await new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/create-admin');
+    xhr.setRequestHeader('content-type', 'application/json');
+    xhr.setRequestHeader('authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss');
+    xhr.setRequestHeader('apikey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss');
+    xhr.onload = () => resolve({ ok: xhr.status < 400, json: () => Promise.resolve(JSON.parse(xhr.responseText)) });
+    xhr.onerror = () => resolve({ ok: false, json: () => Promise.resolve({ error: 'network error' }) });
+    xhr.send(JSON.stringify({ email: email, password: pw, name: name, department: dept||null, role: role }));
   });
 
   const result = await res.json();
