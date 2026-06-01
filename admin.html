@@ -215,7 +215,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 <div id="viewLogin">
   <div class="login-wrap">
     <div class="login-card">
-      <div class="login-logo">엘앤티렉서스(주)</div>
+      <div class="login-logo" style="font-family:'Pretendard',sans-serif;font-weight:700;font-size:20px;letter-spacing:-0.5px;color:var(--text)">엘앤티렉서스(주)</div>
       <div class="login-title">관리자 로그인</div>
       <div class="login-sub">HR 담당자 전용 페이지입니다</div>
       <div class="field"><label>이메일</label><input type="email" id="adminEmail" placeholder="admin@company.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
@@ -230,13 +230,15 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 <div id="viewApp" class="hidden">
   <div class="app">
     <aside class="sidebar">
-      <div class="sb-logo">엘앤티렉서스(주)</div>
+      <div class="sb-logo" style="font-family:'Pretendard',sans-serif;font-weight:600;font-size:14px;letter-spacing:-0.3px">엘앤티렉서스(주)</div>
       <nav class="sb-nav">
         <div class="sb-label">채용 관리</div>
         <button class="sb-link active" onclick="showPage('pipeline',this)">◈ 지원자 파이프라인 <span class="sb-badge" id="sbTotal">0</span></button>
         <button class="sb-link" onclick="showPage('jobs',this)">⊞ 채용 공고 <span class="sb-badge" id="sbJobs">0</span></button>
-        <button class="sb-link" onclick="showPage('candidates',this)">☰ 지원자 관리</button>
-        <button class="sb-link" onclick="showPage('stats',this)">◉ 통계 대시보드</button>
+        <div id="superOnlyMenu" class="hidden">
+          <button class="sb-link" onclick="showPage('candidates',this)">☰ 지원자 관리</button>
+          <button class="sb-link" onclick="showPage('stats',this)">◉ 통계 대시보드</button>
+        </div>
         <div id="superAdminMenu" class="hidden">
           <div class="sb-label" style="margin-top:8px">슈퍼어드민</div>
           <button class="sb-link" onclick="showPage('admins',this)">⊙ 관리자 관리</button>
@@ -258,7 +260,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
       <div id="pagePipeline">
         <div class="topbar">
           <div class="topbar-title">지원자 파이프라인</div>
-          <button class="btn btn-sm" onclick="loadApplications()">↻ 새로고침</button>
+          <button class="btn btn-sm" id="refreshBtn" onclick="manualRefresh()">↻ 새로고침</button>
         </div>
         <div class="content">
           <div class="stats-grid">
@@ -553,6 +555,20 @@ async function doLogout() { await sb.auth.signOut(); location.reload(); }
 function showErr(el, msg) { el.textContent = msg; el.classList.remove('hidden'); }
 
 // ── 앱 진입 ──────────────────────────────────────────────
+// ── 새로고침 ──────────────────────────────────────────────
+function manualRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  if (btn) { btn.textContent = '↻ 새로고침 중...'; btn.disabled = true; }
+  loadApplications().finally(() => {
+    if (btn) { btn.textContent = '↻ 새로고침'; btn.disabled = false; }
+  });
+}
+
+// 1시간마다 자동 새로고침
+setInterval(() => {
+  loadApplications();
+}, 60 * 60 * 1000);
+
 async function showApp() {
   document.getElementById('viewLogin').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
@@ -566,6 +582,8 @@ async function showApp() {
   if (isSuperAdmin) {
     document.getElementById('superAdminMenu').classList.remove('hidden');
     document.getElementById('btnAddJob').classList.remove('hidden');
+    // 슈퍼어드민만 지원자관리/통계 메뉴 표시
+    document.getElementById('superOnlyMenu').classList.remove('hidden');
   }
   await loadJobs();
   await loadApplications();
@@ -919,15 +937,14 @@ async function saveAdmin() {
 
   // Edge Function으로 이메일 인증 없이 계정 생성
   const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss';
-  const headers = new Headers();
-  headers.append('Content-Type', 'application/json');
-  headers.append('Authorization', 'Bearer ' + ANON_KEY);
-  headers.append('apikey', ANON_KEY);
-
   const res = await fetch('https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/create-admin', {
     method: 'POST',
-    headers: headers,
-    body: JSON.stringify({ email, password: pw, name, department: dept||null, role })
+    headers: {
+      'content-type': 'application/json',
+      'authorization': 'Bearer ' + ANON_KEY,
+      'apikey': ANON_KEY
+    },
+    body: JSON.stringify({ email: email, password: pw, name: name, department: dept||null, role: role })
   });
 
   const result = await res.json();
@@ -1005,6 +1022,11 @@ async function toggleAdminActive(id, name, isActive) {
 
 // ── 페이지 전환 ──────────────────────────────────────────
 function showPage(name, el) {
+  // 일반 관리자는 candidates/stats 접근 차단
+  if (adminProfile?.role !== 'superadmin' && ['candidates','stats'].includes(name)) {
+    showToast('접근 권한이 없습니다');
+    return;
+  }
   document.querySelectorAll('.sb-link').forEach(l=>l.classList.remove('active'));
   el.classList.add('active');
   ['Pipeline','Jobs','Candidates','Stats','Admins'].forEach(p=>
@@ -1203,7 +1225,7 @@ function renderStats() {
         <div style="width:80px;font-size:12px;color:var(--text2);text-align:right;flex-shrink:0">${k}</div>
         <div style="flex:1;background:var(--surface2);border-radius:4px;height:24px;overflow:hidden">
           <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;display:flex;align-items:center;padding-left:8px;transition:width .5s">
-            <span style="font-size:11px;font-weight:600;color:#fff;white-space:nowrap">${v}명</span>
+            <span style="font-size:11px;font-weight:600;color:rgba(0,0,0,0.6);white-space:nowrap">${v}명</span>
           </div>
         </div>
         <div style="width:36px;font-size:12px;color:var(--text3);flex-shrink:0">${Math.round(v/total*100)}%</div>
@@ -1211,7 +1233,7 @@ function renderStats() {
     }).join('');
   }
 
-  function statBox(val, label, color='var(--accent)') {
+  function statBox(val, label, color='#7B8FA1') {
     return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center">
       <div style="font-size:32px;font-weight:300;color:${color};margin-bottom:4px">${val}</div>
       <div style="font-size:12px;color:var(--text3)">${label}</div>
@@ -1225,33 +1247,27 @@ function renderStats() {
     </div>`;
   }
 
-  const stageColors = PIPELINE.map(p => p.color);
+  // 파스텔 색상
+  const pastel = ['#A8C5E8','#B5D5C5','#F5C6A0','#C5B8E8','#F0B8C8','#B8D8E8','#D4C5A9'];
+  const stageColors = ['#C8C5E8','#A8C5E8','#B8D8C8','#B8E8C8','#F0C8C8'];
 
   c.innerHTML = `
     <!-- 핵심 지표 -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
-      ${statBox(total, '전체 지원자')}
-      ${statBox(apps.filter(a=>a.stage==='최종합격').length, '최종 합격', 'var(--g600)')}
-      ${statBox(interviewRate+'%', '면접 전환율', 'var(--b600)')}
-      ${statBox(passRate+'%', '최종 합격률', 'var(--g600)')}
+      ${statBox(total, '전체 지원자', '#7B8FA1')}
+      ${statBox(apps.filter(a=>a.stage==='최종합격').length, '최종 합격', '#7BAE8F')}
+      ${statBox(interviewRate+'%', '면접 전환율', '#7B9EC4')}
+      ${statBox(passRate+'%', '최종 합격률', '#7BAE8F')}
     </div>
 
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      <!-- 파이프라인 현황 -->
       ${card('파이프라인 현황', barChart(byStage, stageColors))}
-
-      <!-- 지원 경로 -->
-      ${card('지원 경로별', barChart(bySource, ['#534AB7','#185FA5','#0F6E56','#854F0B','#A32D2D','#888780']))}
-
-      <!-- 성별 -->
-      ${card('성별 분포', barChart(byGender, ['#534AB7','#E8558A','#888780']))}
-
-      <!-- 나이대 -->
-      ${card('나이대 분포', barChart(byAge, ['#534AB7','#185FA5','#0F6E56','#854F0B','#888780']))}
+      ${card('지원 경로별', barChart(bySource, pastel))}
+      ${card('성별 분포', barChart(byGender, ['#A8C5E8','#F0B8C8','#C8C8C8']))}
+      ${card('나이대 분포', barChart(byAge, pastel))}
     </div>
 
-    <!-- 공고별 (전체 보기일 때만) -->
-    ${!jobId ? card('채용 공고별 지원자', barChart(byJob, ['#534AB7','#185FA5','#0F6E56','#854F0B','#A32D2D','#888780','#3C3489'])) : ''}
+    ${!jobId ? card('채용 공고별 지원자', barChart(byJob, pastel)) : ''}
   `;
 }
 
