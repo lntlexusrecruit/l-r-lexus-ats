@@ -235,6 +235,8 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         <div class="sb-label">채용 관리</div>
         <button class="sb-link active" onclick="showPage('pipeline',this)">◈ 지원자 파이프라인 <span class="sb-badge" id="sbTotal">0</span></button>
         <button class="sb-link" onclick="showPage('jobs',this)">⊞ 채용 공고 <span class="sb-badge" id="sbJobs">0</span></button>
+        <button class="sb-link" onclick="showPage('candidates',this)">☰ 지원자 관리</button>
+        <button class="sb-link" onclick="showPage('stats',this)">◉ 통계 대시보드</button>
         <div id="superAdminMenu" class="hidden">
           <div class="sb-label" style="margin-top:8px">슈퍼어드민</div>
           <button class="sb-link" onclick="showPage('admins',this)">⊙ 관리자 관리</button>
@@ -284,6 +286,67 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         <div class="content" id="jobsContent"><div class="loading"><div class="spinner"></div>불러오는 중...</div></div>
       </div>
 
+
+      <!-- 지원자 관리 -->
+      <div id="pageCandidates" class="hidden">
+        <div class="topbar">
+          <div class="topbar-title">지원자 관리</div>
+          <span id="candidateCountInfo" style="font-size:12px;color:var(--text3)"></span>
+          <button class="btn btn-sm btn-danger" onclick="deleteSelected()">선택 삭제</button>
+        </div>
+        <div class="content">
+          <!-- 검색/필터 -->
+          <div class="filter-bar" style="margin-bottom:16px">
+            <input class="search-input" id="candSearch" placeholder="이름, 연락처로 검색..." oninput="renderCandidates()">
+            <select class="filter-select" id="candJobFilter" onchange="renderCandidates()"><option value="">전체 공고</option></select>
+            <select class="filter-select" id="candStageFilter" onchange="renderCandidates()">
+              <option value="">전체 상태</option>
+              <option>지원완료</option><option>1차면접</option><option>2차면접</option>
+              <option>최종합격</option><option>불합격</option>
+            </select>
+            <select class="filter-select" id="candSort" onchange="renderCandidates()">
+              <option value="date_desc">접수일 최신순</option>
+              <option value="date_asc">접수일 오래된순</option>
+              <option value="name_asc">이름순 (가나다)</option>
+              <option value="name_desc">이름순 (역순)</option>
+            </select>
+          </div>
+          <!-- 테이블 -->
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="width:36px"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" style="cursor:pointer"></th>
+                  <th>이름</th>
+                  <th>지원 채용</th>
+                  <th>지원자 상태</th>
+                  <th>지원 경로</th>
+                  <th>접수일</th>
+                  <th>연락처</th>
+                  <th>액션</th>
+                </tr>
+              </thead>
+              <tbody id="candTableBody">
+                <tr><td colspan="8"><div class="loading"><div class="spinner"></div>불러오는 중...</div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 통계 대시보드 -->
+      <div id="pageStats" class="hidden">
+        <div class="topbar">
+          <div class="topbar-title">통계 대시보드</div>
+          <select class="filter-select" id="statsJobFilter" onchange="renderStats()">
+            <option value="">전체 지원자</option>
+          </select>
+          <button class="btn btn-sm" onclick="renderStats()">↻ 새로고침</button>
+        </div>
+        <div class="content" id="statsContent">
+          <div class="loading"><div class="spinner"></div>불러오는 중...</div>
+        </div>
+      </div>
       <!-- 관리자 관리 -->
       <div id="pageAdmins" class="hidden">
         <div class="topbar">
@@ -944,8 +1007,12 @@ async function toggleAdminActive(id, name, isActive) {
 function showPage(name, el) {
   document.querySelectorAll('.sb-link').forEach(l=>l.classList.remove('active'));
   el.classList.add('active');
-  ['Pipeline','Jobs','Admins'].forEach(p=>document.getElementById('page'+p).classList.toggle('hidden', p.toLowerCase()!==name));
+  ['Pipeline','Jobs','Candidates','Stats','Admins'].forEach(p=>
+    document.getElementById('page'+p).classList.toggle('hidden', p.toLowerCase()!==name)
+  );
   if(name==='admins') loadAdmins();
+  if(name==='candidates') loadCandidates();
+  if(name==='stats') loadStats();
 }
 
 function switchTab(name) {
@@ -953,6 +1020,254 @@ function switchTab(name) {
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.querySelector(`.tab[onclick="switchTab('${name}')"]`)?.classList.add('active');
   document.getElementById('tab'+name)?.classList.add('active');
+}
+
+
+// ── 지원자 관리 ──────────────────────────────────────────
+async function loadCandidates() {
+  // 공고 필터 셀렉트 업데이트
+  const sel = document.getElementById('candJobFilter');
+  sel.innerHTML = '<option value="">전체 공고</option>';
+  allJobs.forEach(j => {
+    const o = document.createElement('option');
+    o.value = j.id; o.textContent = j.title; sel.appendChild(o);
+  });
+  renderCandidates();
+}
+
+function renderCandidates() {
+  const q = document.getElementById('candSearch').value.toLowerCase();
+  const job = document.getElementById('candJobFilter').value;
+  const stage = document.getElementById('candStageFilter').value;
+  const sort = document.getElementById('candSort').value;
+
+  let apps = [...allApps].filter(a =>
+    (!q || (a.name||'').toLowerCase().includes(q) || (a.phone||'').includes(q) || (a.email||'').toLowerCase().includes(q)) &&
+    (!job || a.job_posting_id === job) &&
+    (!stage || a.stage === stage)
+  );
+
+  // 정렬
+  apps.sort((a,b) => {
+    if (sort === 'date_desc') return new Date(b.submitted_at||0) - new Date(a.submitted_at||0);
+    if (sort === 'date_asc') return new Date(a.submitted_at||0) - new Date(b.submitted_at||0);
+    if (sort === 'name_asc') return (a.name||'').localeCompare(b.name||'', 'ko');
+    if (sort === 'name_desc') return (b.name||'').localeCompare(a.name||'', 'ko');
+    return 0;
+  });
+
+  document.getElementById('candidateCountInfo').textContent = `전체 ${apps.length}명`;
+
+  const tbody = document.getElementById('candTableBody');
+  if (!apps.length) {
+    tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state"><div class="icon">👥</div><p>지원자가 없습니다</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = apps.map((a,i) => {
+    const ac = AV_COLORS[i % AV_COLORS.length];
+    const sc = PIPELINE.find(p => p.key === (a.stage||'지원완료')) || PIPELINE[0];
+    const date = a.submitted_at ? new Date(a.submitted_at).toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}) : '-';
+    const source = (a.apply_source||[]).join(', ') || '-';
+    return `<tr>
+      <td><input type="checkbox" class="cand-check" value="${a.id}" style="cursor:pointer;accent-color:var(--accent)"></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:28px;height:28px;border-radius:50%;background:${ac.bg};color:${ac.color};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0">${(a.name||'?').slice(0,2)}</div>
+          <div>
+            <div style="font-weight:500;cursor:pointer;color:var(--accent)" onclick="openModal('${a.id}')">${a.name||'이름없음'}</div>
+            <div style="font-size:11px;color:var(--text3)">${a.email||''}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:13px;color:var(--text2)">${a.job_postings?.title||'-'}</td>
+      <td><span class="stage-badge" style="background:${sc.bg};color:${sc.textColor}">${a.stage||'지원완료'}</span></td>
+      <td style="font-size:12px;color:var(--text2)">${source}</td>
+      <td style="font-size:12px;color:var(--text3)">${date}</td>
+      <td style="font-size:12px;color:var(--text2)">${a.phone||'-'}</td>
+      <td>
+        <button class="btn btn-sm btn-danger" onclick="deleteSingle('${a.id}','${(a.name||'').replace(/'/g,"\'")}')">삭제</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.cand-check').forEach(c => c.checked = cb.checked);
+}
+
+async function deleteSingle(id, name) {
+  if (!confirm(`"${name}" 지원자의 데이터를 삭제하시겠습니까?
+이 작업은 되돌릴 수 없습니다.`)) return;
+  showLoading('삭제 중...');
+  await sb.from('education').delete().eq('application_id', id);
+  await sb.from('work_experience').delete().eq('application_id', id);
+  await sb.from('certifications').delete().eq('application_id', id);
+  await sb.from('awards').delete().eq('application_id', id);
+  await sb.from('language_skills').delete().eq('application_id', id);
+  await sb.from('admin_notes').delete().eq('application_id', id);
+  await sb.from('applications').delete().eq('id', id);
+  hideLoading();
+  allApps = allApps.filter(a => a.id !== id);
+  updateStats();
+  renderPipeline();
+  renderCandidates();
+  showToast('✓ 삭제 완료');
+}
+
+async function deleteSelected() {
+  const checked = Array.from(document.querySelectorAll('.cand-check:checked')).map(c => c.value);
+  if (!checked.length) { showToast('삭제할 지원자를 선택해주세요'); return; }
+  if (!confirm(`선택한 ${checked.length}명의 지원자 데이터를 삭제하시겠습니까?`)) return;
+  showLoading('삭제 중...');
+  for (const id of checked) {
+    await sb.from('education').delete().eq('application_id', id);
+    await sb.from('work_experience').delete().eq('application_id', id);
+    await sb.from('certifications').delete().eq('application_id', id);
+    await sb.from('awards').delete().eq('application_id', id);
+    await sb.from('language_skills').delete().eq('application_id', id);
+    await sb.from('admin_notes').delete().eq('application_id', id);
+    await sb.from('applications').delete().eq('id', id);
+  }
+  hideLoading();
+  allApps = allApps.filter(a => !checked.includes(a.id));
+  updateStats();
+  renderPipeline();
+  renderCandidates();
+  showToast(`✓ ${checked.length}명 삭제 완료`);
+}
+
+// ── 통계 대시보드 ─────────────────────────────────────────
+function loadStats() {
+  const sel = document.getElementById('statsJobFilter');
+  sel.innerHTML = '<option value="">전체 지원자</option>';
+  allJobs.forEach(j => {
+    const o = document.createElement('option');
+    o.value = j.id; o.textContent = j.title; sel.appendChild(o);
+  });
+  renderStats();
+}
+
+function renderStats() {
+  const jobId = document.getElementById('statsJobFilter').value;
+  const apps = jobId ? allApps.filter(a => a.job_posting_id === jobId) : allApps;
+  const total = apps.length;
+  const c = document.getElementById('statsContent');
+
+  if (!total) {
+    c.innerHTML = '<div class="empty-state"><div class="icon">📊</div><p>통계 데이터가 없습니다</p></div>';
+    return;
+  }
+
+  // 데이터 계산
+  const byStage = {};
+  PIPELINE.forEach(p => byStage[p.label] = 0);
+  apps.forEach(a => {
+    const p = PIPELINE.find(p => p.key === (a.stage||'지원완료'));
+    if (p) byStage[p.label] = (byStage[p.label]||0) + 1;
+  });
+
+  const byGender = {};
+  apps.forEach(a => { const g = a.gender||'미입력'; byGender[g] = (byGender[g]||0) + 1; });
+
+  const byAge = {'20대':0,'30대':0,'40대':0,'50대 이상':0,'미입력':0};
+  apps.forEach(a => {
+    if (!a.birth_date) { byAge['미입력']++; return; }
+    const age = new Date().getFullYear() - new Date(a.birth_date).getFullYear();
+    if (age < 30) byAge['20대']++;
+    else if (age < 40) byAge['30대']++;
+    else if (age < 50) byAge['40대']++;
+    else byAge['50대 이상']++;
+  });
+
+  const bySource = {};
+  apps.forEach(a => {
+    (a.apply_source||['미입력']).forEach(s => { bySource[s] = (bySource[s]||0) + 1; });
+  });
+
+  const byJob = {};
+  apps.forEach(a => {
+    const title = a.job_postings?.title || '미분류';
+    byJob[title] = (byJob[title]||0) + 1;
+  });
+
+  const passRate = total ? Math.round((apps.filter(a=>a.stage==='최종합격').length / total) * 100) : 0;
+  const interviewRate = total ? Math.round((apps.filter(a=>['1차면접','2차면접','최종합격'].includes(a.stage)).length / total) * 100) : 0;
+
+  function barChart(data, colors) {
+    const max = Math.max(...Object.values(data), 1);
+    return Object.entries(data).filter(([,v])=>v>0).map(([k,v], i) => {
+      const color = colors ? colors[i % colors.length] : 'var(--accent)';
+      const pct = Math.round((v/max)*100);
+      return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+        <div style="width:80px;font-size:12px;color:var(--text2);text-align:right;flex-shrink:0">${k}</div>
+        <div style="flex:1;background:var(--surface2);border-radius:4px;height:24px;overflow:hidden">
+          <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;display:flex;align-items:center;padding-left:8px;transition:width .5s">
+            <span style="font-size:11px;font-weight:600;color:#fff;white-space:nowrap">${v}명</span>
+          </div>
+        </div>
+        <div style="width:36px;font-size:12px;color:var(--text3);flex-shrink:0">${Math.round(v/total*100)}%</div>
+      </div>`;
+    }).join('');
+  }
+
+  function statBox(val, label, color='var(--accent)') {
+    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center">
+      <div style="font-size:32px;font-weight:300;color:${color};margin-bottom:4px">${val}</div>
+      <div style="font-size:12px;color:var(--text3)">${label}</div>
+    </div>`;
+  }
+
+  function card(title, content) {
+    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px">${title}</div>
+      ${content}
+    </div>`;
+  }
+
+  const stageColors = PIPELINE.map(p => p.color);
+
+  c.innerHTML = `
+    <!-- 핵심 지표 -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
+      ${statBox(total, '전체 지원자')}
+      ${statBox(apps.filter(a=>a.stage==='최종합격').length, '최종 합격', 'var(--g600)')}
+      ${statBox(interviewRate+'%', '면접 전환율', 'var(--b600)')}
+      ${statBox(passRate+'%', '최종 합격률', 'var(--g600)')}
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <!-- 파이프라인 현황 -->
+      ${card('파이프라인 현황', barChart(byStage, stageColors))}
+
+      <!-- 지원 경로 -->
+      ${card('지원 경로별', barChart(bySource, ['#534AB7','#185FA5','#0F6E56','#854F0B','#A32D2D','#888780']))}
+
+      <!-- 성별 -->
+      ${card('성별 분포', barChart(byGender, ['#534AB7','#E8558A','#888780']))}
+
+      <!-- 나이대 -->
+      ${card('나이대 분포', barChart(byAge, ['#534AB7','#185FA5','#0F6E56','#854F0B','#888780']))}
+    </div>
+
+    <!-- 공고별 (전체 보기일 때만) -->
+    ${!jobId ? card('채용 공고별 지원자', barChart(byJob, ['#534AB7','#185FA5','#0F6E56','#854F0B','#A32D2D','#888780','#3C3489'])) : ''}
+  `;
+}
+
+function hideLoading(){document.getElementById('loadingOverlay')?.classList.add('hidden');}
+function showLoading(txt){
+  let ol = document.getElementById('loadingOverlay');
+  if (!ol) {
+    ol = document.createElement('div');
+    ol.id = 'loadingOverlay';
+    ol.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;gap:14px';
+    ol.innerHTML = '<div class="spinner"></div><div style="font-size:14px;color:var(--text2)">' + (txt||'처리 중...') + '</div>';
+    document.body.appendChild(ol);
+  } else {
+    ol.classList.remove('hidden');
+    ol.querySelector('div:last-child').textContent = txt||'처리 중...';
+  }
 }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
