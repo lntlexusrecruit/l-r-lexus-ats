@@ -1513,7 +1513,18 @@ function renderDispatchPipeline() {
         <div class="col-body">
           ${stageApps.length ? stageApps.map((a,i) => {
             const ac = AV_COLORS[i % AV_COLORS.length];
-            return '<div class="app-card" onclick="openDispatchCandidate(''+a.id+'')"><div class="app-card-top"><div class="app-card-avatar" style="background:'+ac.bg+';color:'+ac.color+'">'+(a.name||'?').slice(0,2)+'</div><div><div class="app-card-name">'+(a.name||'이름없음')+'</div><div class="app-card-role">'+(a.phone||'')+'</div></div></div>'+(a.resume_url?'<div style="margin-top:8px"><a href="'+a.resume_url+'" target="_blank" onclick="event.stopPropagation()" style="font-size:12px;color:var(--b600);text-decoration:none">📎 이력서 보기</a></div>':'')+(a.memo?'<div style="font-size:12px;color:var(--text3);margin-top:6px">'+a.memo+'</div>':'')+'</div>';
+            const cardId = a.id;
+            return `<div class="app-card" onclick="openDispatchCandidate('${cardId}')">
+              <div class="app-card-top">
+                <div class="app-card-avatar" style="background:${ac.bg};color:${ac.color}">${(a.name||'?').slice(0,2)}</div>
+                <div>
+                  <div class="app-card-name">${a.name||'이름없음'}</div>
+                  <div class="app-card-role">${a.phone||''}</div>
+                </div>
+              </div>
+              ${a.resume_url ? `<div style="margin-top:8px"><a href="${a.resume_url}" target="_blank" onclick="event.stopPropagation()" style="font-size:12px;color:var(--b600);text-decoration:none">📎 이력서 보기</a></div>` : ''}
+              ${a.memo ? `<div style="font-size:12px;color:var(--text3);margin-top:6px">${a.memo}</div>` : ''}
+            </div>`;
           }).join('') : '<div style="text-align:center;padding:20px;font-size:13px;color:var(--text3)">없음</div>'}
         </div>
       </div>`;
