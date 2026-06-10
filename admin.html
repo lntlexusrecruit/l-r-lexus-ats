@@ -18,11 +18,11 @@
   --gray50:#F7F6F2;--gray100:#EDEDEA;--gray200:#D6D4CE;--gray400:#9E9C97;--gray600:#5F5E5A;--gray900:#1A1918;
   --bg:#F4F3EF;--surface:#fff;--surface2:#F7F6F2;
   --border:rgba(0,0,0,0.08);--border2:rgba(0,0,0,0.14);
-  --text:#1A1918;--text2:#5F5E5A;--text3:#A09E98;
+  --text:#1A1918;--text2:#3A3937;--text3:#6B6966;
   --accent:#534AB7;--accent-hover:#3C3489;--accent-bg:#EEEDFE;
   --radius:12px;--rsm:8px;--rxs:6px;
 }
-body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;line-height:1.6;}
+body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;line-height:1.6;}
 .hidden{display:none!important}
 
 /* 로그인 */
@@ -43,8 +43,8 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .sidebar{width:220px;background:var(--surface);border-right:0.5px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
 .sb-logo{padding:16px 20px;border-bottom:0.5px solid var(--border);font-family:'DM Serif Display',serif;font-size:15px;color:var(--text)}
 .sb-nav{flex:1;padding:12px 0;overflow-y:auto}
-.sb-label{font-size:10px;font-weight:500;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;padding:8px 20px 4px}
-.sb-link{display:flex;align-items:center;gap:10px;padding:8px 20px;font-size:13px;color:var(--text2);cursor:pointer;transition:background .12s;border:none;background:none;width:100%;font-family:'Pretendard',sans-serif;text-align:left}
+.sb-label{font-size:11px;font-weight:500;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;padding:8px 20px 4px}
+.sb-link{display:flex;align-items:center;gap:10px;padding:9px 20px;font-size:14px;color:var(--text2);cursor:pointer;transition:background .12s;border:none;background:none;width:100%;font-family:'Pretendard',sans-serif;text-align:left}
 .sb-link:hover{background:var(--surface2)}
 .sb-link.active{background:var(--accent-bg);color:var(--p800);font-weight:500}
 .sb-badge{margin-left:auto;font-size:10px;background:var(--surface2);color:var(--text3);padding:1px 7px;border-radius:20px}
@@ -61,7 +61,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .topbar-title{font-size:14px;font-weight:500;flex:1}
 
 /* 버튼 */
-.btn{font-family:'Pretendard',sans-serif;font-size:13px;font-weight:500;padding:7px 16px;border-radius:var(--rxs);border:0.5px solid var(--border2);cursor:pointer;background:var(--surface);color:var(--text2);transition:all .12s}
+.btn{font-family:'Pretendard',sans-serif;font-size:14px;font-weight:500;padding:8px 16px;border-radius:var(--rxs);border:0.5px solid var(--border2);cursor:pointer;background:var(--surface);color:var(--text2);transition:all .12s}
 .btn:hover{background:var(--surface2)}
 .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
 .btn-primary:hover{background:var(--accent-hover)}
@@ -75,30 +75,30 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .content{padding:24px 28px;flex:1}
 
 /* 파이프라인 칸반 */
-.pipeline-wrap{display:flex;gap:14px;overflow-x:auto;padding-bottom:8px}
-.pipeline-col{min-width:240px;width:240px;flex-shrink:0}
-.col-header{padding:10px 12px;border-radius:var(--rsm) var(--rsm) 0 0;display:flex;align-items:center;gap:8px;margin-bottom:2px}
+.pipeline-wrap{display:flex;gap:0;overflow-x:auto;padding-bottom:8px;border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.pipeline-col{flex:1;min-width:180px;flex-shrink:0;border-right:0.5px solid var(--border2)}
+.col-header{padding:12px 14px;display:flex;align-items:center;gap:8px;border-bottom:0.5px solid var(--border2)}
 .col-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.col-name{font-size:12px;font-weight:600;flex:1}
-.col-count{font-size:11px;font-weight:500;padding:1px 8px;border-radius:20px}
-.col-body{display:flex;flex-direction:column;gap:8px;min-height:200px}
+.col-name{font-size:13px;font-weight:600;flex:1}
+.col-count{font-size:12px;font-weight:500;padding:2px 9px;border-radius:20px}
+.col-body{display:flex;flex-direction:column;gap:8px;min-height:300px;padding:10px;background:var(--surface)}
 
 /* 지원자 카드 */
-.app-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rsm);padding:12px;cursor:pointer;transition:all .15s}
+.app-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rsm);padding:14px;cursor:pointer;transition:all .15s;box-shadow:0 1px 3px rgba(0,0,0,0.05)}
 .app-card:hover{border-color:var(--accent);box-shadow:0 2px 8px rgba(83,74,183,.1)}
 .app-card-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .app-card-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0}
-.app-card-name{font-size:13px;font-weight:500}
-.app-card-role{font-size:11px;color:var(--text3)}
+.app-card-name{font-size:14px;font-weight:500}
+.app-card-role{font-size:12px;color:var(--text3)}
 .app-card-meta{display:flex;gap:6px;flex-wrap:wrap}
-.app-card-tag{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--surface2);color:var(--text2)}
-.app-card-date{font-size:10px;color:var(--text3);margin-top:6px}
+.app-card-tag{font-size:11px;padding:2px 7px;border-radius:20px;background:var(--surface2);color:var(--text2)}
+.app-card-date{font-size:11px;color:var(--text3);margin-top:6px}
 
 /* 통계 */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
 .stat-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:18px}
 .stat-val{font-size:28px;font-weight:300;color:var(--text);margin-bottom:2px}
-.stat-label{font-size:12px;color:var(--text3)}
+.stat-label{font-size:13px;color:var(--text3)}
 
 /* 필터 */
 .filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
@@ -110,11 +110,11 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 /* 테이블 */
 .table-wrap{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden}
 .table{width:100%;border-collapse:collapse}
-.table th{font-size:11px;font-weight:500;color:var(--text3);text-align:left;padding:10px 16px;border-bottom:0.5px solid var(--border);background:var(--surface2);text-transform:uppercase;letter-spacing:.05em}
-.table td{padding:12px 16px;border-bottom:0.5px solid var(--border);font-size:13px;vertical-align:middle}
+.table th{font-size:12px;font-weight:500;color:var(--text3);text-align:left;padding:11px 16px;border-bottom:0.5px solid var(--border);background:var(--surface2);text-transform:uppercase;letter-spacing:.05em}
+.table td{padding:13px 16px;border-bottom:0.5px solid var(--border);font-size:14px;vertical-align:middle}
 .table tr:last-child td{border-bottom:none}
 .table tr.clickable:hover td{background:var(--surface2);cursor:pointer}
-.stage-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:3px 10px;border-radius:20px}
+.stage-badge{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;padding:4px 11px;border-radius:20px}
 
 /* 모달 */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:flex-start;justify-content:flex-end}
@@ -127,22 +127,22 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .profile-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;padding:16px;background:var(--surface2);border-radius:var(--rsm)}
 .profile-avatar{width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:500;flex-shrink:0}
 .section{margin-bottom:22px}
-.section-title{font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+.section-title{font-size:13px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
 .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .info-item{background:var(--surface2);border-radius:var(--rxs);padding:10px 12px}
-.info-item .label{font-size:11px;color:var(--text3);margin-bottom:2px}
-.info-item .val{font-size:13px;font-weight:500}
+.info-item .label{font-size:12px;color:var(--text3);margin-bottom:2px}
+.info-item .val{font-size:14px;font-weight:500}
 .full-width{grid-column:1/-1}
 .exp-card{border:0.5px solid var(--border);border-radius:var(--rsm);padding:12px;margin-bottom:8px}
-.exp-title{font-size:13px;font-weight:600}
-.exp-sub{font-size:12px;color:var(--text2);margin-top:1px}
-.exp-period{font-size:11px;color:var(--text3);margin-top:3px}
-.exp-desc{font-size:13px;color:var(--text2);margin-top:6px;line-height:1.65}
+.exp-title{font-size:14px;font-weight:600}
+.exp-sub{font-size:13px;color:var(--text2);margin-top:1px}
+.exp-period{font-size:12px;color:var(--text3);margin-top:3px}
+.exp-desc{font-size:14px;color:var(--text2);margin-top:6px;line-height:1.65}
 .essay-card{border:0.5px solid var(--border);border-radius:var(--rsm);padding:14px;margin-bottom:10px}
-.essay-q{font-size:12px;font-weight:600;color:var(--p800);margin-bottom:6px}
-.essay-a{font-size:13px;color:var(--text2);line-height:1.7}
+.essay-q{font-size:13px;font-weight:600;color:var(--p800);margin-bottom:6px}
+.essay-a{font-size:14px;color:var(--text2);line-height:1.7}
 .tabs{display:flex;border-bottom:0.5px solid var(--border);margin-bottom:18px}
-.tab{padding:9px 16px;font-size:13px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:color .12s}
+.tab{padding:10px 16px;font-size:14px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-0.5px;transition:color .12s}
 .tab:hover{color:var(--text)}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:500}
 .tab-content{display:none}
@@ -239,6 +239,8 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
           <button class="sb-link" onclick="showPage('candidates',this)">☰ 지원자 관리</button>
           <button class="sb-link" onclick="showPage('stats',this)">◉ 통계 대시보드</button>
         </div>
+        <div class="sb-label" style="margin-top:8px">파견직</div>
+        <button class="sb-link" id="dispatchMenu" onclick="showPage('dispatch',this)">🚌 파견직 관리 <span class="sb-badge" id="sbDispatch">0</span></button>
         <div id="superAdminMenu" class="hidden">
           <div class="sb-label" style="margin-top:8px">슈퍼어드민</div>
           <button class="sb-link" onclick="showPage('admins',this)">⊙ 관리자 관리</button>
@@ -347,6 +349,43 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         </div>
         <div class="content" id="statsContent">
           <div class="loading"><div class="spinner"></div>불러오는 중...</div>
+        </div>
+      </div>
+
+      <!-- 파견직 관리 -->
+      <div id="pageDispatch" class="hidden">
+        <div class="topbar">
+          <div class="topbar-title">파견직 관리</div>
+          <button id="btnAddDispatchJob" class="btn btn-primary btn-sm hidden" onclick="openDispatchJobForm()">+ 파견 공고 등록</button>
+        </div>
+        <div class="content">
+          <!-- 파견 공고 리스트 -->
+          <div id="dispatchJobList">
+            <div class="loading"><div class="spinner"></div>불러오는 중...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 파견 공고 상세 (지원자 파이프라인) -->
+      <div id="pageDispatchDetail" class="hidden">
+        <div class="topbar">
+          <button class="btn btn-sm" onclick="showPage('dispatch', document.querySelector('.sb-link[onclick*=dispatch]'))">← 목록으로</button>
+          <div class="topbar-title" id="dispatchDetailTitle" style="margin-left:12px">파견 공고</div>
+          <button id="btnUploadResume" class="btn btn-primary btn-sm" onclick="openResumeUpload()">+ 이력서 업로드</button>
+        </div>
+        <div class="content">
+          <!-- 업체 정보 -->
+          <div id="dispatchAgencyInfo" style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:20px;display:flex;align-items:center;gap:16px">
+            <div style="font-size:20px">🏢</div>
+            <div>
+              <div style="font-size:14px;font-weight:600" id="agencyName">-</div>
+              <div style="font-size:13px;color:var(--text3)" id="agencyContact">-</div>
+            </div>
+            <div style="margin-left:auto;font-size:13px;color:var(--text3)" id="dispatchJobMeta">-</div>
+          </div>
+
+          <!-- 파이프라인 -->
+          <div class="pipeline-wrap" id="dispatchPipeline"></div>
         </div>
       </div>
       <!-- 관리자 관리 -->
@@ -506,6 +545,67 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
   </div>
 </div>
 
+
+<!-- 파견 공고 등록 폼 -->
+<div id="dispatchJobFormModal" class="form-modal hidden">
+  <div class="form-modal-inner">
+    <div class="form-modal-title" id="dispatchJobFormTitle">파견 공고 등록</div>
+    <div class="field"><label>공고 제목 <span style="color:var(--accent)">*</span></label><input type="text" id="djTitle" placeholder="예: 강남전시장 SC 파견"></div>
+    <div class="field"><label>파견업체 <span style="color:var(--accent)">*</span></label>
+      <select id="djAgency">
+        <option value="">업체 선택</option>
+      </select>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="field"><label>근무지</label><input type="text" id="djLocation" placeholder="서울 강남구"></div>
+      <div class="field"><label>파견 기간</label><input type="text" id="djPeriod" placeholder="2026.07 ~ 2026.12"></div>
+    </div>
+    <div class="field"><label>업무 내용</label><textarea id="djDesc" rows="3" placeholder="파견 업무 내용을 입력하세요"></textarea></div>
+    <div class="field"><label>담당자 지정</label>
+      <div id="djManagers" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn" onclick="closeDispatchJobForm()">취소</button>
+      <button class="btn btn-primary" onclick="saveDispatchJob()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 파견업체 등록 폼 -->
+<div id="dispatchAgencyFormModal" class="form-modal hidden">
+  <div class="form-modal-inner">
+    <div class="form-modal-title">파견업체 등록</div>
+    <div class="field"><label>업체명 <span style="color:var(--accent)">*</span></label><input type="text" id="daName" placeholder="(주)파견업체"></div>
+    <div class="field"><label>담당자명</label><input type="text" id="daContact" placeholder="홍길동"></div>
+    <div class="field"><label>연락처</label><input type="text" id="daPhone" placeholder="010-0000-0000"></div>
+    <div class="field"><label>이메일 <span style="color:var(--accent)">*</span></label><input type="email" id="daEmail" placeholder="agency@company.com"></div>
+    <div class="field"><label>로그인 비밀번호 <span style="color:var(--accent)">*</span></label><input type="text" id="daPw" placeholder="8자 이상"></div>
+    <div class="err hidden" id="daErr"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn" onclick="closeDispatchAgencyForm()">취소</button>
+      <button class="btn btn-primary" onclick="saveDispatchAgency()">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- 이력서 업로드 폼 -->
+<div id="resumeUploadModal" class="form-modal hidden">
+  <div class="form-modal-inner">
+    <div class="form-modal-title">이력서 업로드</div>
+    <div class="field"><label>지원자 이름 <span style="color:var(--accent)">*</span></label><input type="text" id="ruName" placeholder="홍길동"></div>
+    <div class="field"><label>연락처</label><input type="text" id="ruPhone" placeholder="010-0000-0000"></div>
+    <div class="field"><label>이력서 파일 <span style="color:var(--accent)">*</span></label>
+      <input type="file" id="ruFile" accept=".pdf,.doc,.docx,.hwp" style="font-family:'Pretendard',sans-serif;font-size:13px;padding:8px 0">
+      <div class="field-hint" style="font-size:12px;color:var(--text3);margin-top:4px">PDF, Word, HWP 파일 지원 · 최대 10MB</div>
+    </div>
+    <div class="field"><label>메모</label><textarea id="ruMemo" rows="2" placeholder="특이사항 등"></textarea></div>
+    <div class="err hidden" id="ruErr"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn" onclick="closeResumeUpload()">취소</button>
+      <button class="btn btn-primary" onclick="uploadResume()">업로드</button>
+    </div>
+  </div>
+</div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -716,8 +816,8 @@ function renderPipeline() {
   wrap.innerHTML = PIPELINE.map(stage => {
     const stageApps = apps.filter(a => (a.stage || '지원완료') === stage.key);
     return `
-      <div class="pipeline-col">
-        <div class="col-header" style="background:${stage.bg}20">
+      <div class="pipeline-col" style="background:${stage.bg}15">
+        <div class="col-header" style="background:${stage.bg}40">
           <div class="col-dot" style="background:${stage.color}"></div>
           <div class="col-name" style="color:${stage.textColor}">${stage.label}</div>
           <span class="col-count" style="background:${stage.bg};color:${stage.textColor}">${stageApps.length}</span>
@@ -936,15 +1036,12 @@ async function saveAdmin() {
   if(pw.length<8){showErr(err,'비밀번호는 8자 이상이어야 합니다');return;}
 
   // Edge Function으로 이메일 인증 없이 계정 생성
-  const res = await new Promise((resolve) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', 'https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/create-admin');
-    xhr.setRequestHeader('content-type', 'application/json');
-    xhr.setRequestHeader('authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss');
-    xhr.setRequestHeader('apikey', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss');
-    xhr.onload = () => resolve({ ok: xhr.status < 400, json: () => Promise.resolve(JSON.parse(xhr.responseText)) });
-    xhr.onerror = () => resolve({ ok: false, json: () => Promise.resolve({ error: 'network error' }) });
-    xhr.send(JSON.stringify({ email: email, password: pw, name: name, department: dept||null, role: role }));
+  const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss';
+  const reqBody = JSON.stringify({ email: email, password: pw, name: name, department: dept||null, role: role });
+  const res = await fetch('https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/create-admin', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss', 'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss' },
+    body: reqBody
   });
 
   const result = await res.json();
@@ -1284,6 +1381,305 @@ function showLoading(txt){
     ol.classList.remove('hidden');
     ol.querySelector('div:last-child').textContent = txt||'처리 중...';
   }
+}
+
+// ── 파견직 관리 ──────────────────────────────────────────────────────
+let allDispatchJobs = [];
+let allAgencies = [];
+let currentDispatchJobId = null;
+let allDispatchCandidates = [];
+
+const DISPATCH_PIPELINE = [
+  { key: '지원', label: '지원자', color: '#888780', bg: '#F1EFE8', textColor: '#5F5E5A' },
+  { key: '1차면접', label: '1차면접', color: '#534AB7', bg: '#EEEDFE', textColor: '#3C3489' },
+  { key: '합격', label: '합격', color: '#3B6D11', bg: '#EAF3DE', textColor: '#27500A' },
+  { key: '불합격', label: '불합격', color: '#A32D2D', bg: '#FCEBEB', textColor: '#A32D2D' },
+];
+
+async function loadDispatchJobs() {
+  const c = document.getElementById('dispatchJobList');
+  c.innerHTML = '<div class="loading"><div class="spinner"></div>불러오는 중...</div>';
+
+  // 파견업체 로드
+  const { data: agencies } = await sb.from('dispatch_agencies').select('*').order('name');
+  allAgencies = agencies || [];
+
+  // 파견 공고 로드 (권한 체크)
+  let query = sb.from('dispatch_postings').select('*, dispatch_agencies(name, contact_name, phone)').order('created_at', { ascending: false });
+
+  if (adminProfile?.role !== 'superadmin') {
+    const { data: perms } = await sb.from('dispatch_permissions').select('dispatch_posting_id').eq('admin_id', currentAdmin.id);
+    const ids = (perms || []).map(p => p.dispatch_posting_id);
+    if (!ids.length) {
+      c.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>배정된 파견 공고가 없습니다</p></div>';
+      return;
+    }
+    query = query.in('id', ids);
+  }
+
+  const { data: jobs } = await query;
+  allDispatchJobs = jobs || [];
+  document.getElementById('sbDispatch').textContent = allDispatchJobs.length;
+
+  if (!allDispatchJobs.length) {
+    c.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>등록된 파견 공고가 없습니다</p></div>';
+    return;
+  }
+
+  const isSuperAdmin = adminProfile?.role === 'superadmin';
+
+  c.innerHTML = `
+    ${isSuperAdmin ? `
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn btn-primary btn-sm" onclick="openDispatchJobForm()">+ 파견 공고 등록</button>
+      <button class="btn btn-sm" onclick="openDispatchAgencyForm()">🏢 파견업체 등록</button>
+    </div>` : ''}
+    ${allDispatchJobs.map(j => `
+      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px;cursor:pointer;transition:all .15s" onclick="openDispatchDetail('${j.id}')" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="width:8px;height:8px;border-radius:50%;background:${j.is_active?'#3B6D11':'#9E9C97'};margin-top:6px;flex-shrink:0"></div>
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:600;margin-bottom:4px">${j.title}</div>
+            <div style="font-size:13px;color:var(--text3);display:flex;gap:12px;flex-wrap:wrap">
+              <span>🏢 ${j.dispatch_agencies?.name || '-'}</span>
+              ${j.location ? `<span>📍 ${j.location}</span>` : ''}
+              ${j.period ? `<span>📅 ${j.period}</span>` : ''}
+              <span style="color:${j.is_active?'var(--g600)':'var(--text3)'};font-weight:500">${j.is_active?'모집중':'마감'}</span>
+            </div>
+            ${j.description ? `<div style="font-size:13px;color:var(--text2);margin-top:8px">${j.description}</div>` : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text3);flex-shrink:0">→</div>
+        </div>
+      </div>
+    `).join('')}
+  `;
+}
+
+async function openDispatchDetail(jobId) {
+  currentDispatchJobId = jobId;
+  const job = allDispatchJobs.find(j => j.id === jobId);
+  if (!job) return;
+
+  document.getElementById('dispatchDetailTitle').textContent = job.title;
+  document.getElementById('agencyName').textContent = job.dispatch_agencies?.name || '-';
+  document.getElementById('agencyContact').textContent = `${job.dispatch_agencies?.contact_name || ''} ${job.dispatch_agencies?.phone || ''}`.trim() || '-';
+  document.getElementById('dispatchJobMeta').textContent = `${job.location || ''} ${job.period ? '· ' + job.period : ''}`.trim();
+
+  showPage('dispatchDetail', null);
+  await loadDispatchCandidates(jobId);
+}
+
+async function loadDispatchCandidates(jobId) {
+  const { data } = await sb.from('dispatch_candidates').select('*').eq('dispatch_posting_id', jobId).order('created_at', { ascending: false });
+  allDispatchCandidates = data || [];
+  renderDispatchPipeline();
+}
+
+function renderDispatchPipeline() {
+  const wrap = document.getElementById('dispatchPipeline');
+  wrap.innerHTML = DISPATCH_PIPELINE.map(stage => {
+    const stageApps = allDispatchCandidates.filter(a => (a.stage || '지원') === stage.key);
+    return `
+      <div class="pipeline-col" style="background:${stage.bg}15">
+        <div class="col-header" style="background:${stage.bg}40">
+          <div class="col-dot" style="background:${stage.color}"></div>
+          <div class="col-name" style="color:${stage.textColor}">${stage.label}</div>
+          <span class="col-count" style="background:${stage.bg};color:${stage.textColor}">${stageApps.length}</span>
+        </div>
+        <div class="col-body">
+          ${stageApps.length ? stageApps.map((a,i) => {
+            const ac = AV_COLORS[i % AV_COLORS.length];
+            return `<div class="app-card" onclick="openDispatchCandidate('${a.id}')">
+              <div class="app-card-top">
+                <div class="app-card-avatar" style="background:${ac.bg};color:${ac.color}">${(a.name||'?').slice(0,2)}</div>
+                <div>
+                  <div class="app-card-name">${a.name||'이름없음'}</div>
+                  <div class="app-card-role">${a.phone||''}</div>
+                </div>
+              </div>
+              ${a.resume_url ? `<div style="margin-top:8px"><a href="${a.resume_url}" target="_blank" onclick="event.stopPropagation()" style="font-size:12px;color:var(--b600);text-decoration:none">📎 이력서 보기</a></div>` : ''}
+              ${a.memo ? `<div style="font-size:12px;color:var(--text3);margin-top:6px">${a.memo}</div>` : ''}
+            </div>`;
+          }).join('') : `<div style="text-align:center;padding:20px;font-size:13px;color:var(--text3)">없음</div>`}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function openDispatchCandidate(id) {
+  const cand = allDispatchCandidates.find(c => c.id === id);
+  if (!cand) return;
+
+  showConfirm(
+    `${cand.name} 단계 변경`,
+    '이 지원자의 단계를 변경하세요',
+    null
+  );
+
+  // 단계 선택 팝업 커스텀
+  document.getElementById('confirmTitle').textContent = cand.name;
+  document.getElementById('confirmSub').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+      ${DISPATCH_PIPELINE.map(p => `
+        <button class="btn" style="background:${p.bg};color:${p.textColor};border-color:${p.color}30;padding:10px" onclick="updateDispatchStage('${id}','${p.key}')">
+          ${p.label} ${(cand.stage||'지원')===p.key ? '✓ 현재' : ''}
+        </button>
+      `).join('')}
+      ${cand.resume_url ? `<a href="${cand.resume_url}" target="_blank" class="btn" style="text-align:center;text-decoration:none">📎 이력서 보기</a>` : ''}
+    </div>
+  `;
+  document.getElementById('confirmYes').style.display = 'none';
+  document.getElementById('confirmNo').textContent = '닫기';
+  document.getElementById('confirmNo').onclick = () => {
+    document.getElementById('confirmModal').classList.add('hidden');
+    document.getElementById('confirmYes').style.display = '';
+    document.getElementById('confirmNo').textContent = '아니요';
+    document.getElementById('confirmNo').onclick = () => confirmAction(false);
+  };
+}
+
+async function updateDispatchStage(id, stage) {
+  await sb.from('dispatch_candidates').update({ stage, updated_at: new Date().toISOString() }).eq('id', id);
+  const cand = allDispatchCandidates.find(c => c.id === id);
+  if (cand) cand.stage = stage;
+  document.getElementById('confirmModal').classList.add('hidden');
+  document.getElementById('confirmYes').style.display = '';
+  document.getElementById('confirmNo').textContent = '아니요';
+  document.getElementById('confirmNo').onclick = () => confirmAction(false);
+  renderDispatchPipeline();
+  showToast('단계 변경 완료');
+}
+
+// 파견 공고 등록
+function openDispatchJobForm() {
+  ['djTitle','djLocation','djPeriod','djDesc'].forEach(id => document.getElementById(id).value = '');
+  const sel = document.getElementById('djAgency');
+  sel.innerHTML = '<option value="">업체 선택</option>' + allAgencies.map(a => `<option value="${a.id}">${a.name}</option>`).join('');
+  const mgrs = document.getElementById('djManagers');
+  mgrs.innerHTML = allAdmins.filter(a => a.role === 'manager').map(a => `
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs)">
+      <input type="checkbox" value="${a.id}" style="accent-color:var(--accent)"> ${a.name} (${a.department||'-'})
+    </label>
+  `).join('');
+  document.getElementById('dispatchJobFormModal').classList.remove('hidden');
+}
+function closeDispatchJobForm() { document.getElementById('dispatchJobFormModal').classList.add('hidden'); }
+
+async function saveDispatchJob() {
+  const title = document.getElementById('djTitle').value.trim();
+  const agencyId = document.getElementById('djAgency').value;
+  if (!title || !agencyId) { showToast('공고 제목과 파견업체를 선택해주세요'); return; }
+  const { data, error } = await sb.from('dispatch_postings').insert({
+    title,
+    agency_id: agencyId,
+    location: document.getElementById('djLocation').value,
+    period: document.getElementById('djPeriod').value,
+    description: document.getElementById('djDesc').value,
+    is_active: true
+  }).select('id').single();
+  if (error) { showToast('오류: ' + error.message); return; }
+  // 담당자 권한 부여
+  const checked = Array.from(document.querySelectorAll('#djManagers input:checked')).map(c => c.value);
+  if (checked.length) {
+    await sb.from('dispatch_permissions').insert(checked.map(aid => ({ admin_id: aid, dispatch_posting_id: data.id })));
+  }
+  closeDispatchJobForm();
+  await loadDispatchJobs();
+  showToast('✓ 파견 공고 등록 완료');
+}
+
+// 파견업체 등록
+function openDispatchAgencyForm() { document.getElementById('dispatchAgencyFormModal').classList.remove('hidden'); }
+function closeDispatchAgencyForm() { document.getElementById('dispatchAgencyFormModal').classList.add('hidden'); }
+
+async function saveDispatchAgency() {
+  const name = document.getElementById('daName').value.trim();
+  const email = document.getElementById('daEmail').value.trim();
+  const pw = document.getElementById('daPw').value;
+  const err = document.getElementById('daErr');
+  err.classList.add('hidden');
+  if (!name || !email || !pw) { err.textContent = '업체명, 이메일, 비밀번호를 입력하세요'; err.classList.remove('hidden'); return; }
+
+  // Edge Function으로 계정 생성
+  const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss';
+  const res = await new Promise((resolve) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/create-admin');
+    xhr.setRequestHeader('content-type', 'application/json');
+    xhr.setRequestHeader('authorization', 'Bearer ' + KEY);
+    xhr.setRequestHeader('apikey', KEY);
+    xhr.onload = () => resolve({ ok: xhr.status < 400, json: () => Promise.resolve(JSON.parse(xhr.responseText)) });
+    xhr.onerror = () => resolve({ ok: false, json: () => Promise.resolve({ error: 'network error' }) });
+    xhr.send(JSON.stringify({ email, password: pw, name, role: 'agency' }));
+  });
+
+  const result = await res.json();
+  if (!res.ok) { err.textContent = result.error || '등록 실패'; err.classList.remove('hidden'); return; }
+
+  // dispatch_agencies에 저장
+  await sb.from('dispatch_agencies').insert({
+    id: result.id,
+    name,
+    contact_name: document.getElementById('daContact').value,
+    phone: document.getElementById('daPhone').value,
+    email,
+    is_active: true
+  });
+
+  closeDispatchAgencyForm();
+  await loadDispatchJobs();
+  showToast('✓ 파견업체 등록 완료');
+}
+
+// 이력서 업로드
+function openResumeUpload() {
+  ['ruName','ruPhone','ruMemo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ruFile').value = '';
+  document.getElementById('ruErr').classList.add('hidden');
+  document.getElementById('resumeUploadModal').classList.remove('hidden');
+}
+function closeResumeUpload() { document.getElementById('resumeUploadModal').classList.add('hidden'); }
+
+async function uploadResume() {
+  const name = document.getElementById('ruName').value.trim();
+  const file = document.getElementById('ruFile').files[0];
+  const err = document.getElementById('ruErr');
+  err.classList.add('hidden');
+  if (!name) { err.textContent = '지원자 이름을 입력하세요'; err.classList.remove('hidden'); return; }
+  if (!file) { err.textContent = '이력서 파일을 선택해주세요'; err.classList.remove('hidden'); return; }
+  if (file.size > 10 * 1024 * 1024) { err.textContent = '파일 크기는 10MB 이하여야 합니다'; err.classList.remove('hidden'); return; }
+
+  showLoading('이력서 업로드 중...');
+
+  // Supabase Storage에 업로드
+  const fileName = `${currentDispatchJobId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const { data: uploadData, error: uploadError } = await sb.storage.from('dispatch-resumes').upload(fileName, file);
+
+  if (uploadError) {
+    hideLoading();
+    err.textContent = '업로드 실패: ' + uploadError.message;
+    err.classList.remove('hidden');
+    return;
+  }
+
+  // Public URL 가져오기
+  const { data: urlData } = sb.storage.from('dispatch-resumes').getPublicUrl(fileName);
+
+  // DB에 저장
+  await sb.from('dispatch_candidates').insert({
+    dispatch_posting_id: currentDispatchJobId,
+    name,
+    phone: document.getElementById('ruPhone').value,
+    memo: document.getElementById('ruMemo').value,
+    resume_url: urlData.publicUrl,
+    resume_filename: file.name,
+    stage: '지원'
+  });
+
+  hideLoading();
+  closeResumeUpload();
+  await loadDispatchCandidates(currentDispatchJobId);
+  showToast('✓ 이력서 업로드 완료');
 }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
