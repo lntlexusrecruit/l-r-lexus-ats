@@ -1536,7 +1536,7 @@ async function openDispatchCandidate(id) {
   if (!cand) return;
   showConfirm(cand.name, '단계를 선택하세요', null);
   document.getElementById('confirmSub').innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">'
-    + DISPATCH_PIPELINE.map(p => '<button class="btn" style="background:'+p.bg+';color:'+p.textColor+';border-color:'+p.color+'30;padding:10px" onclick="updateDispatchStage(''+id+'',''+p.key+'')">'+p.label+((cand.stage||'지원')===p.key?' ✓ 현재':'')+'</button>').join('')
+    + DISPATCH_PIPELINE.map(p => `<button class="btn" style="background:${p.bg};color:${p.textColor};border-color:${p.color}30;padding:10px" onclick="updateDispatchStage('${id}','${p.key}')">${p.label}${(cand.stage||'지원')===p.key?' ✓ 현재':''}</button>`).join('')
     + (cand.resume_url ? '<a href="'+cand.resume_url+'" target="_blank" class="btn" style="text-align:center;text-decoration:none">📎 이력서 보기</a>' : '')
     + '</div>';
   document.getElementById('confirmYes').style.display = 'none';
@@ -1658,7 +1658,10 @@ async function loadDispatchAgencies() {
   const { data: agencies, error } = await sb.from('dispatch_agencies').select('*').order('created_at', { ascending: false });
   if (error) { c.innerHTML = '<div class="empty-state"><p>오류: '+error.message+'</p></div>'; return; }
   if (!agencies?.length) { c.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>등록된 파견업체가 없습니다</p></div>'; return; }
-  c.innerHTML = agencies.map(a => '<div class="admin-card"><div class="avatar" style="background:#FAEEDA;color:#633806;width:36px;height:36px;font-size:13px;flex-shrink:0">'+a.name[0]+'</div><div class="admin-info"><div class="admin-name">'+a.name+' <span class="role-badge role-manager">파견업체</span>'+(a.is_active?'':'<span style="font-size:11px;color:var(--r600)">(비활성)</span>')+'</div><div class="admin-email">'+(a.email||'')+' '+(a.contact_name?'· '+a.contact_name:'')+' '+(a.phone?'· '+a.phone:'')+'</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-danger" onclick="toggleAgencyActive(''+a.id+'',''+a.name.replace(/'/g,"\'")+'',' +a.is_active+')">'+(a.is_active?'비활성화':'활성화')+'</button></div></div>').join('');
+  c.innerHTML = agencies.map(a => {
+    const safeName = a.name.replace(/'/g, "\\'");
+    return `<div class="admin-card"><div class="avatar" style="background:#FAEEDA;color:#633806;width:36px;height:36px;font-size:13px;flex-shrink:0">${a.name[0]}</div><div class="admin-info"><div class="admin-name">${a.name} <span class="role-badge role-manager">파견업체</span>${a.is_active?'':'<span style="font-size:11px;color:var(--r600)">(비활성)</span>'}</div><div class="admin-email">${a.email||''} ${a.contact_name?'· '+a.contact_name:''} ${a.phone?'· '+a.phone:''}</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-danger" onclick="toggleAgencyActive('${a.id}','${safeName}',${a.is_active})">${a.is_active?'비활성화':'활성화'}</button></div></div>`;
+  }).join('');
 }
 
 async function toggleAgencyActive(id, name, isActive) {
@@ -1679,7 +1682,9 @@ async function loadDispatchAdmins() {
   const { data: allPerms } = await sb.from('dispatch_permissions').select('*, dispatch_postings(title)');
   c.innerHTML = dispatchAdmins.map(a => {
     const perms = (allPerms||[]).filter(p=>p.admin_id===a.id);
-    return '<div class="admin-card"><div class="avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0">'+a.name[0]+'</div><div class="admin-info"><div class="admin-name">'+a.name+' <span class="role-badge role-manager">파견 담당자</span></div><div class="admin-email">'+a.email+(a.department?' · '+a.department:'')+'</div><div class="admin-perms" style="margin-top:6px">'+(perms.length?perms.filter(p=>p.dispatch_postings).map(p=>'<span class="perm-tag">📋 '+p.dispatch_postings.title+'</span>').join(''):'<span style="font-size:11px;color:var(--text3)">파견 공고 권한 없음</span>')+'</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-primary" onclick="openDispatchPermEdit(''+a.id+'',''+a.name.replace(/'/g,"\'")+'')">권한 설정</button><button class="btn btn-sm btn-danger" onclick="removeDispatchAdmin(''+a.id+'',''+a.name.replace(/'/g,"\'")+'')">삭제</button></div></div>';
+    const safeName2 = a.name.replace(/'/g, "\\'");
+    const permTags = perms.length ? perms.filter(p=>p.dispatch_postings).map(p=>`<span class="perm-tag">📋 ${p.dispatch_postings.title}</span>`).join('') : '<span style="font-size:11px;color:var(--text3)">파견 공고 권한 없음</span>';
+    return `<div class="admin-card"><div class="avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${a.name[0]}</div><div class="admin-info"><div class="admin-name">${a.name} <span class="role-badge role-manager">파견 담당자</span></div><div class="admin-email">${a.email}${a.department?' · '+a.department:''}</div><div class="admin-perms" style="margin-top:6px">${permTags}</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-primary" onclick="openDispatchPermEdit('${a.id}','${safeName2}')">권한 설정</button><button class="btn btn-sm btn-danger" onclick="removeDispatchAdmin('${a.id}','${safeName2}')">삭제</button></div></div>`;
   }).join('');
 }
 
