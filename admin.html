@@ -52,7 +52,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .sb-footer{padding:14px 20px;border-top:0.5px solid var(--border);display:flex;align-items:center;gap:10px}
 .avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;background:var(--accent);color:#fff}
 .role-badge{font-size:10px;padding:2px 8px;border-radius:20px;margin-top:2px;display:inline-block}
-.role-super{background:#FAEEDA;color:#633806}
+.role-super{background:#FAEEDA;color:#633806}.role-agency{background:#FEF3C7;color:#92400E}
 .role-manager{background:var(--p50);color:var(--p800)}
 .main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
 
@@ -232,17 +232,19 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     <aside class="sidebar">
       <div class="sb-logo" style="font-family:'Pretendard',sans-serif;font-weight:600;font-size:14px;letter-spacing:-0.3px">엘앤티렉서스(주)</div>
       <nav class="sb-nav">
-        <div class="sb-label">채용 관리</div>
-        <button class="sb-link active" onclick="showPage('pipeline',this)">◈ 지원자 파이프라인 <span class="sb-badge" id="sbTotal">0</span></button>
-        <button class="sb-link" onclick="showPage('jobs',this)">⊞ 채용 공고 <span class="sb-badge" id="sbJobs">0</span></button>
-        <div id="superOnlyMenu" class="hidden">
-          <button class="sb-link" onclick="showPage('candidates',this)">☰ 지원자 관리</button>
-          <button class="sb-link" onclick="showPage('stats',this)">◉ 통계 대시보드</button>
+        <div class="sb-label" id="recruitMenuLabel">채용 관리</div>
+        <div id="recruitMenu">
+          <button class="sb-link active" onclick="showPage('pipeline',this)">◈ 지원자 파이프라인 <span class="sb-badge" id="sbTotal">0</span></button>
+          <button class="sb-link" onclick="showPage('jobs',this)">⊞ 채용 공고 <span class="sb-badge" id="sbJobs">0</span></button>
+          <div id="superOnlyMenu" class="hidden">
+            <button class="sb-link" onclick="showPage('candidates',this)">☰ 지원자 관리</button>
+            <button class="sb-link" onclick="showPage('stats',this)">◉ 통계 대시보드</button>
+          </div>
         </div>
         <div class="sb-label" style="margin-top:8px">파견직</div>
         <button class="sb-link" id="dispatchMenu" onclick="showPage('dispatch',this)">🚌 파견직 관리 <span class="sb-badge" id="sbDispatch">0</span></button>
-        <button class="sb-link" onclick="showPage('dispatchAgencies',this)">🏢 파견업체 관리</button>
-        <button class="sb-link" onclick="showPage('dispatchAdmins',this)">👤 파견 담당자 관리</button>
+        <button class="sb-link" id="dispatchAgenciesMenuBtn" onclick="showPage('dispatchAgencies',this)">🏢 파견업체 관리</button>
+        <button class="sb-link" id="dispatchAdminsMenuBtn" onclick="showPage('dispatchAdmins',this)">👤 파견 담당자 관리</button>
         <div id="superAdminMenu" class="hidden">
           <div class="sb-label" style="margin-top:8px">슈퍼어드민</div>
           <button class="sb-link" onclick="showPage('admins',this)">⊙ 관리자 관리</button>
@@ -703,19 +705,33 @@ setInterval(() => {
 async function showApp() {
   document.getElementById('viewLogin').classList.add('hidden');
   document.getElementById('viewApp').classList.remove('hidden');
-  const isSuperAdmin = adminProfile?.role === 'superadmin';
+  const role = adminProfile?.role;
+  const isAgency = role === 'agency';
+  const isSuperAdmin = role === 'superadmin';
   const name = adminProfile?.name || currentAdmin.email.split('@')[0];
   document.getElementById('adminName').textContent = name;
   document.getElementById('adminAvatar').textContent = name[0].toUpperCase();
   const rb = document.getElementById('roleBadge');
-  rb.textContent = isSuperAdmin ? '슈퍼어드민' : '관리자';
-  rb.className = 'role-badge ' + (isSuperAdmin ? 'role-super' : 'role-manager');
+  rb.textContent = isSuperAdmin ? '슈퍼어드민' : isAgency ? '파견업체' : '관리자';
+  rb.className = 'role-badge ' + (isSuperAdmin ? 'role-super' : isAgency ? 'role-agency' : 'role-manager');
   if (isSuperAdmin) {
     document.getElementById('superAdminMenu').classList.remove('hidden');
     document.getElementById('btnAddJob').classList.remove('hidden');
-    // 슈퍼어드민만 지원자관리/통계 메뉴 표시
     document.getElementById('superOnlyMenu').classList.remove('hidden');
   }
+  if (isAgency) {
+    // 파견업체 로그인: 파견직 관리만 보이게
+    document.getElementById('recruitMenu').classList.add('hidden');
+    document.getElementById('dispatchAdminsMenuBtn').classList.add('hidden');
+    document.getElementById('dispatchAgenciesMenuBtn').classList.add('hidden');
+    // 파견직 파이프라인 바로 오픈
+    showPage('dispatch', document.getElementById('dispatchMenu'));
+    await loadDispatchJobs();
+    return;
+  }
+  // 공고 등록폼용 allAgencies 미리 로드
+  const { data: agenciesPreload } = await sb.from('dispatch_agencies').select('id,name').order('name');
+  allAgencies = agenciesPreload || [];
   await loadJobs();
   await loadApplications();
 }
@@ -1437,8 +1453,17 @@ async function loadDispatchJobs() {
   const { data: agencies } = await sb.from('dispatch_agencies').select('*').order('name');
   allAgencies = agencies || [];
 
-  let query = sb.from('dispatch_postings').select('*, dispatch_agencies(name, contact_name, phone)').order('created_at', { ascending: false });
-  if (adminProfile?.role !== 'superadmin') {
+  let query = sb.from('dispatch_postings').select('*, dispatch_agencies(name, contact_name, phone, email)').order('created_at', { ascending: false });
+  const role = adminProfile?.role;
+  if (role === 'agency') {
+    // 파견업체 계정: dispatch_agencies.id = currentAdmin.id 인 공고만
+    const myAgency = allAgencies.find(a => a.id === currentAdmin.id);
+    if (!myAgency) {
+      c.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>연결된 파견업체 정보가 없습니다</p></div>';
+      return;
+    }
+    query = query.eq('agency_id', myAgency.id);
+  } else if (role !== 'superadmin') {
     const { data: perms } = await sb.from('dispatch_permissions').select('dispatch_posting_id').eq('admin_id', currentAdmin.id);
     const ids = (perms || []).map(p => p.dispatch_posting_id);
     if (!ids.length) {
@@ -1561,10 +1586,20 @@ async function updateDispatchStage(id, stage) {
   showToast('✓ 단계 변경 완료');
 }
 
-function openDispatchJobForm() {
+async function openDispatchJobForm() {
   ['djTitle','djLocation','djPeriod','djDesc'].forEach(id => document.getElementById(id).value = '');
+  // allAgencies가 비어있으면 새로 로드
+  if (!allAgencies.length) {
+    const { data: ag } = await sb.from('dispatch_agencies').select('id,name').eq('is_active', true).order('name');
+    allAgencies = ag || [];
+  }
   const sel = document.getElementById('djAgency');
-  sel.innerHTML = '<option value="">업체 선택</option>' + allAgencies.map(a => '<option value="'+a.id+'">'+a.name+'</option>').join('');
+  if (!allAgencies.length) {
+    sel.innerHTML = '<option value="">등록된 업체 없음 — 먼저 파견업체를 등록하세요</option>';
+    showToast('⚠ 파견업체를 먼저 등록해주세요');
+  } else {
+    sel.innerHTML = '<option value="">업체 선택</option>' + allAgencies.map(a => '<option value="'+a.id+'">'+a.name+'</option>').join('');
+  }
   document.getElementById('djManagers').innerHTML = allAdmins.filter(a=>a.role==='manager').map(a => '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs)"><input type="checkbox" value="'+a.id+'" style="accent-color:var(--accent)"> '+a.name+' ('+(a.department||'-')+')</label>').join('');
   document.getElementById('dispatchJobFormModal').classList.remove('hidden');
 }
@@ -1620,6 +1655,9 @@ async function saveDispatchAgency() {
   if (!res.ok) { err.textContent = result.error || '등록 실패'; err.classList.remove('hidden'); return; }
   await sb.from('dispatch_agencies').insert({ id: result.id, name, contact_name: document.getElementById('daContact').value, phone: document.getElementById('daPhone').value, email, is_active: true });
   closeDispatchAgencyForm();
+  // allAgencies 갱신 (공고 등록폼 드롭다운에 바로 반영)
+  const { data: ag } = await sb.from('dispatch_agencies').select('id,name').order('name');
+  allAgencies = ag || [];
   await loadDispatchAgencies();
   showToast('✓ 파견업체 등록 완료');
 }
@@ -1660,7 +1698,21 @@ async function loadDispatchAgencies() {
   if (!agencies?.length) { c.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>등록된 파견업체가 없습니다</p></div>'; return; }
   c.innerHTML = agencies.map(a => {
     const safeName = a.name.replace(/'/g, "\\'");
-    return `<div class="admin-card"><div class="avatar" style="background:#FAEEDA;color:#633806;width:36px;height:36px;font-size:13px;flex-shrink:0">${a.name[0]}</div><div class="admin-info"><div class="admin-name">${a.name} <span class="role-badge role-manager">파견업체</span>${a.is_active?'':'<span style="font-size:11px;color:var(--r600)">(비활성)</span>'}</div><div class="admin-email">${a.email||''} ${a.contact_name?'· '+a.contact_name:''} ${a.phone?'· '+a.phone:''}</div></div><div style="display:flex;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-danger" onclick="toggleAgencyActive('${a.id}','${safeName}',${a.is_active})">${a.is_active?'비활성화':'활성화'}</button></div></div>`;
+    return `<div class="admin-card" style="align-items:flex-start;gap:14px">
+      <div class="avatar" style="background:#FAEEDA;color:#633806;width:40px;height:40px;font-size:14px;flex-shrink:0;margin-top:2px">${a.name[0]}</div>
+      <div class="admin-info" style="flex:1;min-width:0">
+        <div class="admin-name">${a.name} <span class="role-badge role-agency">파견업체</span>${a.is_active?'':'<span style=\"font-size:11px;color:var(--r600);margin-left:6px\">(비활성)</span>'}</div>
+        <div class="admin-email" style="margin-top:4px;display:flex;flex-wrap:wrap;gap:8px">
+          ${a.email ? `<span>✉️ ${a.email}</span>` : ''}
+          ${a.contact_name ? `<span>👤 ${a.contact_name}</span>` : ''}
+          ${a.phone ? `<span>📞 ${a.phone}</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
+        <button class="btn btn-sm" onclick="viewAgencyJobs('${a.id}','${safeName}')">공고 보기</button>
+        <button class="btn btn-sm btn-danger" onclick="toggleAgencyActive('${a.id}','${safeName}',${a.is_active})">${a.is_active?'비활성화':'활성화'}</button>
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -1669,6 +1721,36 @@ async function toggleAgencyActive(id, name, isActive) {
   await sb.from('dispatch_agencies').update({ is_active: !isActive }).eq('id', id);
   await loadDispatchAgencies();
   showToast((isActive?'비활성화':'활성화')+' 완료');
+}
+
+// ── 파견업체 공고 보기 ────────────────────────────────────
+async function viewAgencyJobs(agencyId, agencyName) {
+  // 해당 업체 공고 목록을 confirm 모달에 표시
+  const { data: jobs } = await sb.from('dispatch_postings')
+    .select('id, title, is_active, location, period')
+    .eq('agency_id', agencyId)
+    .order('created_at', { ascending: false });
+  showConfirm(agencyName + ' 파견 공고', '', null);
+  if (!jobs?.length) {
+    document.getElementById('confirmSub').innerHTML = '<p style="color:var(--text3);font-size:13px;margin-top:8px">등록된 파견 공고가 없습니다</p>';
+  } else {
+    document.getElementById('confirmSub').innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">'
+      + jobs.map(j => `<div style="padding:10px;border:0.5px solid var(--border);border-radius:var(--rxs);cursor:pointer;background:var(--surface)" onclick="closeConfirmModal();openDispatchDetail('${j.id}')">
+          <div style="font-weight:600;font-size:13px">${j.title}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px">${j.location||''} ${j.period?'· '+j.period:''} <span style="color:${j.is_active?'var(--g600)':'var(--text3)'}">${j.is_active?'모집중':'마감'}</span></div>
+        </div>`).join('')
+      + '</div>';
+  }
+  document.getElementById('confirmYes').style.display = 'none';
+  document.getElementById('confirmNo').textContent = '닫기';
+  document.getElementById('confirmNo').onclick = () => closeConfirmModal();
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirmModal').classList.add('hidden');
+  document.getElementById('confirmYes').style.display = '';
+  document.getElementById('confirmNo').textContent = '아니요';
+  document.getElementById('confirmNo').onclick = () => confirmAction(false);
 }
 
 // ── 파견 담당자 관리 ───────────────────────────────────────
