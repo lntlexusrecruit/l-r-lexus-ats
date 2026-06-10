@@ -243,8 +243,8 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         </div>
         <div class="sb-label" style="margin-top:8px">파견직</div>
         <button class="sb-link" id="dispatchMenu" onclick="showPage('dispatch',this)">🚌 파견직 관리 <span class="sb-badge" id="sbDispatch">0</span></button>
-        <button class="sb-link" id="dispatchAgenciesMenuBtn" onclick="showPage('dispatchAgencies',this)">🏢 파견업체 관리</button>
-        <button class="sb-link" id="dispatchAdminsMenuBtn" onclick="showPage('dispatchAdmins',this)">👤 파견 담당자 관리</button>
+        <button class="sb-link" id="dispatchAgenciesMenuBtn" onclick="showPage('dispatchagencies',this)">🏢 파견업체 관리</button>
+        <button class="sb-link" id="dispatchAdminsMenuBtn" onclick="showPage('dispatchadmins',this)">👤 파견 담당자 관리</button>
         <div id="superAdminMenu" class="hidden">
           <div class="sb-label" style="margin-top:8px">슈퍼어드민</div>
           <button class="sb-link" onclick="showPage('admins',this)">⊙ 관리자 관리</button>
@@ -1173,7 +1173,7 @@ function showPage(name, el) {
   document.querySelectorAll('.sb-link').forEach(l=>l.classList.remove('active'));
   if (el) el.classList.add('active');
   ['Pipeline','Jobs','Candidates','Stats','Admins','Dispatch','DispatchDetail','DispatchAgencies','DispatchAdmins'].forEach(p=>
-    document.getElementById('page'+p)?.classList.toggle('hidden', p.toLowerCase()!==name)
+    document.getElementById('page'+p)?.classList.toggle('hidden', p.toLowerCase()!==name.toLowerCase())
   );
   if(name==='admins') loadAdmins();
   if(name==='candidates') loadCandidates();
@@ -1514,7 +1514,7 @@ async function openDispatchDetail(jobId) {
   document.getElementById('agencyName').textContent = job.dispatch_agencies?.name || '-';
   document.getElementById('agencyContact').textContent = (job.dispatch_agencies?.contact_name || '') + ' ' + (job.dispatch_agencies?.phone || '');
   document.getElementById('dispatchJobMeta').textContent = (job.location || '') + (job.period ? ' · ' + job.period : '');
-  showPage('dispatchDetail', null);
+  showPage('dispatchdetail', null);
   await loadDispatchCandidates(jobId);
 }
 
