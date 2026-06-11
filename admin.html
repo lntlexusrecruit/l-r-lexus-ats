@@ -94,6 +94,23 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .app-card-tag{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--surface2);color:var(--text2)}
 .app-card-date{font-size:10px;color:var(--text3);margin-top:6px}
 
+/* 공고 대시보드 */
+.job-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:4px 0}
+.job-dash-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.job-dash-card:hover{border-color:var(--accent);box-shadow:0 4px 16px rgba(83,74,183,.12);transform:translateY(-1px)}
+.job-dash-card-title{font-size:15px;font-weight:600;margin-bottom:4px;color:var(--text)}
+.job-dash-card-dept{font-size:12px;color:var(--text3);margin-bottom:14px}
+.job-dash-card-stats{display:flex;gap:10px;flex-wrap:wrap}
+.job-dash-stat{display:flex;flex-direction:column;align-items:center;padding:8px 14px;border-radius:var(--rxs);min-width:60px}
+.job-dash-stat-val{font-size:20px;font-weight:600;line-height:1}
+.job-dash-stat-label{font-size:10px;color:var(--text3);margin-top:3px;white-space:nowrap}
+.job-dash-status{position:absolute;top:14px;right:14px;font-size:10px;padding:2px 8px;border-radius:20px}
+/* 면접관 승인 배지 */
+.interviewer-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}
+.iv-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500}
+.iv-badge.ok{background:#EAF3DE;color:#27500A}
+.iv-badge.pending{background:#F1EFE8;color:#888780}
+.iv-badge.mine-pending{background:#FEF3E2;color:#7A3D00;border:1px solid #F5CFA0}
 /* 통계 */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
 .stat-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:18px}
@@ -234,7 +251,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
       <nav class="sb-nav">
         <div class="sb-label" id="recruitMenuLabel">채용 관리</div>
         <div id="recruitMenu">
-          <button class="sb-link active" onclick="showPage('pipeline',this)">◈ 지원자 파이프라인 <span class="sb-badge" id="sbTotal">0</span></button>
+          <button class="sb-link active" id="sbDashboard" onclick="showPage('dashboard',this)">⊡ 공고 현황 <span class="sb-badge" id="sbTotal">0</span></button>
           <button class="sb-link" onclick="showPage('jobs',this)">⊞ 채용 공고 <span class="sb-badge" id="sbJobs">0</span></button>
           <div id="superOnlyMenu" class="hidden">
             <button class="sb-link" onclick="showPage('candidates',this)">☰ 지원자 관리</button>
@@ -265,9 +282,21 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 
     <div class="main">
       <!-- 파이프라인 -->
-      <div id="pagePipeline">
+      <!-- 공고 대시보드 (기본 홈) -->
+      <div id="pageDashboard">
+        <div class="topbar">
+          <div class="topbar-title">공고 현황</div>
+          <button class="btn btn-sm" id="refreshDashBtn" onclick="loadDashboard()">↻ 새로고침</button>
+        </div>
+        <div class="content">
+          <div id="dashboardContent"><div class="loading"><div class="spinner"></div>불러오는 중...</div></div>
+        </div>
+      </div>
+
+      <div id="pagePipeline" class="hidden">
         <div class="topbar">
           <div class="topbar-title">지원자 파이프라인</div>
+          <button class="btn btn-sm" onclick="showPage('dashboard', document.getElementById('sbDashboard'))">← 공고 목록</button>
           <button class="btn btn-sm" id="refreshBtn" onclick="manualRefresh()">↻ 새로고침</button>
         </div>
         <div class="content">
@@ -756,6 +785,9 @@ async function showApp() {
   allAgencies = agenciesPreload || [];
   await loadJobs();
   await loadApplications();
+  // 첫 화면은 대시보드
+  showPage('dashboard', document.getElementById('sbDashboard'));
+  await loadDashboard();
 }
 
 // ── 공고 ─────────────────────────────────────────────────
@@ -884,6 +916,13 @@ async function loadApplications() {
   const { data, error } = await query;
   if (error) { showToast('불러오기 실패: ' + error.message); return; }
   allApps = data || [];
+  // 면접관 승인 캐시 로드 (파이프라인 카드 배지용)
+  const [{ data: ivApprovals }, { data: ivList }] = await Promise.all([
+    sb.from('interview_approvals').select('application_id, admin_id, admin_profiles(name)'),
+    sb.from('job_interviewers').select('job_id, admin_id, admin_profiles(name)')
+  ]);
+  window._cachedApprovals = ivApprovals || [];
+  window._cachedInterviewers = ivList || [];
   updateStats();
   renderPipeline();
 }
@@ -906,9 +945,108 @@ function getFilteredApps() {
   );
 }
 
+// ── 공고 대시보드 ─────────────────────────────────────────
+async function loadDashboard() {
+  const c = document.getElementById('dashboardContent');
+  c.innerHTML = '<div class="loading"><div class="spinner"></div>불러오는 중...</div>';
+
+  // 면접관 승인 현황 전체 로드
+  const { data: allApprovals } = await sb.from('interview_approvals').select('application_id, admin_id, admin_profiles(name)');
+  const { data: allInterviewers } = await sb.from('job_interviewers').select('job_id, admin_id, admin_profiles(name)');
+
+  const myId = currentAdmin.id;
+  const jobs = allJobs.filter(j => j.is_active);
+
+  if (!jobs.length) {
+    c.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>진행 중인 공고가 없습니다</p></div>';
+    return;
+  }
+
+  const html = jobs.map(j => {
+    const jobApps = allApps.filter(a => a.job_posting_id === j.id);
+    const newApps   = jobApps.filter(a => (a.stage||'지원완료') === '지원완료').length;
+    const reviewing = jobApps.filter(a => (a.stage||'지원완료') === '관리자검토').length;
+    const interview = jobApps.filter(a => ['1차면접','2차면접'].includes(a.stage||'')).length;
+    const passed    = jobApps.filter(a => a.stage === '최종합격').length;
+    const total     = jobApps.length;
+
+    // 이 공고 면접관 목록
+    const jInterviewers = (allInterviewers||[]).filter(i => i.job_id === j.id);
+    // 1차면접 중인 지원자들 중 내가 아직 승인 안 한 사람
+    const myPendingCount = jInterviewers.some(i => i.admin_id === myId)
+      ? jobApps.filter(a => {
+          if (a.stage !== '1차면접') return false;
+          const approved = (allApprovals||[]).filter(ap => ap.application_id === a.id).map(ap => ap.admin_id);
+          return !approved.includes(myId);
+        }).length
+      : 0;
+
+    return `<div class="job-dash-card" onclick="openJobPipeline('${j.id}')">
+      <span class="job-dash-status" style="background:#EAF3DE;color:#27500A">모집중</span>
+      <div class="job-dash-card-title">${j.title}</div>
+      <div class="job-dash-card-dept">${j.department||''} ${j.location?'· '+j.location:''}</div>
+      <div class="job-dash-card-stats">
+        <div class="job-dash-stat" style="background:#F1EFE8">
+          <div class="job-dash-stat-val" style="color:#5F5E5A">${newApps}</div>
+          <div class="job-dash-stat-label">신규지원</div>
+        </div>
+        <div class="job-dash-stat" style="background:#FEF3E2">
+          <div class="job-dash-stat-val" style="color:#7A3D00">${reviewing}</div>
+          <div class="job-dash-stat-label">검토중</div>
+        </div>
+        <div class="job-dash-stat" style="background:#EEEDFE">
+          <div class="job-dash-stat-val" style="color:#3C3489">${interview}</div>
+          <div class="job-dash-stat-label">면접중</div>
+        </div>
+        <div class="job-dash-stat" style="background:#EAF3DE">
+          <div class="job-dash-stat-val" style="color:#27500A">${passed}</div>
+          <div class="job-dash-stat-label">최종합격</div>
+        </div>
+      </div>
+      ${myPendingCount > 0 ? `<div style="margin-top:10px;padding:7px 10px;background:#FEF3E2;border-radius:var(--rxs);font-size:12px;color:#7A3D00;font-weight:500">⚠ 내 면접 승인 대기: ${myPendingCount}명</div>` : ''}
+      ${jInterviewers.length > 0 ? renderInterviewerBadgesSummary(j.id, jobApps, jInterviewers, allApprovals||[]) : ''}
+    </div>`;
+  }).join('');
+
+  c.innerHTML = `<div class="job-dash-grid">${html}</div>`;
+}
+
+function renderInterviewerBadgesSummary(jobId, jobApps, interviewers, allApprovals) {
+  // 1차면접 중인 지원자가 있을 때만 면접관 승인 현황 표시
+  const interviewApps = jobApps.filter(a => a.stage === '1차면접');
+  if (!interviewApps.length) return '';
+
+  // 면접관별 승인 완료 수
+  const summary = interviewers.map(iv => {
+    const approvedCount = interviewApps.filter(a => {
+      return allApprovals.some(ap => ap.application_id === a.id && ap.admin_id === iv.admin_id);
+    }).length;
+    const isMe = iv.admin_id === currentAdmin.id;
+    const allDone = approvedCount >= interviewApps.length;
+    return `<span class="iv-badge ${allDone ? 'ok' : isMe ? 'mine-pending' : 'pending'}">
+      ${allDone ? '✅' : isMe ? '⚠' : '⬜'} ${iv.admin_profiles?.name||'-'} ${approvedCount}/${interviewApps.length}
+    </span>`;
+  }).join('');
+
+  return `<div style="margin-top:8px;font-size:10px;color:var(--text3);margin-bottom:3px">면접관 승인 현황</div>
+    <div class="interviewer-badges">${summary}</div>`;
+}
+
+function openJobPipeline(jobId) {
+  // 해당 공고 필터 적용 후 파이프라인으로 이동
+  const jobFilter = document.getElementById('jobFilter');
+  if (jobFilter) jobFilter.value = jobId;
+  showPage('pipeline', null);
+  // 사이드바 active 표시 없이 pipeline만 열기
+  renderPipeline();
+}
+
 function renderPipeline() {
   const wrap = document.getElementById('pipelineWrap');
   const apps = getFilteredApps();
+  // 면접관 승인 캐시 (renderPipeline은 동기함수라 캐시 사용)
+  const approvals = window._cachedApprovals || [];
+  const interviewers = window._cachedInterviewers || [];
   wrap.innerHTML = PIPELINE.map(stage => {
     const stageApps = apps.filter(a => (a.stage || '지원완료') === stage.key);
     return `
@@ -922,6 +1060,21 @@ function renderPipeline() {
           ${stageApps.length ? stageApps.map((a,i) => {
             const ac = AV_COLORS[i%AV_COLORS.length];
             const date = a.submitted_at ? new Date(a.submitted_at).toLocaleDateString('ko-KR',{month:'short',day:'numeric'}) : '';
+            // 1차면접 단계: 면접관 승인 현황 배지
+            let ivBadges = '';
+            if (stage.key === '1차면접') {
+              const jobIvs = interviewers.filter(iv => iv.job_id === a.job_posting_id);
+              if (jobIvs.length) {
+                const appApprovals = approvals.filter(ap => ap.application_id === a.id).map(ap => ap.admin_id);
+                ivBadges = `<div class="interviewer-badges" style="margin-top:6px">${
+                  jobIvs.map(iv => {
+                    const ok = appApprovals.includes(iv.admin_id);
+                    const isMe = iv.admin_id === currentAdmin.id;
+                    return `<span class="iv-badge ${ok?'ok':isMe?'mine-pending':'pending'}">${ok?'✅':isMe?'⚠':'⬜'} ${iv.admin_profiles?.name||'-'}</span>`;
+                  }).join('')
+                }</div>`;
+              }
+            }
             return `<div class="app-card" onclick="openModal('${a.id}')">
               <div class="app-card-top">
                 <div class="app-card-avatar" style="background:${ac.bg};color:${ac.color}">${(a.name||'?').slice(0,2)}</div>
@@ -933,6 +1086,7 @@ function renderPipeline() {
               <div class="app-card-meta">
                 ${(a.apply_source||[]).map(s=>`<span class="app-card-tag">${s}</span>`).join('')}
               </div>
+              ${ivBadges}
               <div class="app-card-date">${date}</div>
             </div>`;
           }).join('') : `<div style="text-align:center;padding:20px;font-size:12px;color:var(--text3)">지원자 없음</div>`}
@@ -1018,6 +1172,9 @@ async function handleInterviewApproval(appId, app) {
     // 내 승인 추가
     await sb.from('interview_approvals').insert({ application_id: appId, admin_id: myId });
     approvedIds.push(myId);
+    // 캐시 갱신
+    window._cachedApprovals = [...(window._cachedApprovals||[]), { application_id: appId, admin_id: myId, admin_profiles: { name: adminProfile?.name } }];
+    renderPipeline();
   }
 
   const total = interviewers.length;
@@ -1298,7 +1455,7 @@ function showPage(name, el) {
   }
   document.querySelectorAll('.sb-link').forEach(l=>l.classList.remove('active'));
   if (el) el.classList.add('active');
-  ['Pipeline','Jobs','Candidates','Stats','Admins','Dispatch','DispatchDetail','DispatchAgencies','DispatchAdmins'].forEach(p=>
+  ['Dashboard','Pipeline','Jobs','Candidates','Stats','Admins','Dispatch','DispatchDetail','DispatchAgencies','DispatchAdmins'].forEach(p=>
     document.getElementById('page'+p)?.classList.toggle('hidden', p.toLowerCase()!==name.toLowerCase())
   );
   if(name==='admins') loadAdmins();
