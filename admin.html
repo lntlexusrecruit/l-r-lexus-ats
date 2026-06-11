@@ -663,13 +663,12 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 <script>
 // ── 파이프라인 설정 ───────────────────────────────────────
 const PIPELINE = [
-  { key: '지원완료',    label: '지원자',           color: '#888780', bg: '#F1EFE8', textColor: '#5F5E5A' },
-  { key: '관리자검토',  label: '관리자 검토',       color: '#B25C00', bg: '#FEF3E2', textColor: '#7A3D00' },
-  { key: '1차면접',     label: '1차면접',           color: '#534AB7', bg: '#EEEDFE', textColor: '#3C3489' },
-  { key: '면접관검토',  label: '면접관 검토',       color: '#0C6E8A', bg: '#E0F4FA', textColor: '#084F63' },
-  { key: '2차면접',     label: '2차면접',           color: '#185FA5', bg: '#E6F1FB', textColor: '#0C447C' },
-  { key: '최종합격',    label: '최종합격',          color: '#3B6D11', bg: '#EAF3DE', textColor: '#27500A' },
-  { key: '불합격',      label: '불합격',            color: '#A32D2D', bg: '#FCEBEB', textColor: '#A32D2D' },
+  { key: '지원완료',    label: '지원자',      color: '#888780', bg: '#F1EFE8', textColor: '#5F5E5A' },
+  { key: '관리자검토',  label: '관리자 검토', color: '#B25C00', bg: '#FEF3E2', textColor: '#7A3D00' },
+  { key: '1차면접',     label: '1차면접',     color: '#534AB7', bg: '#EEEDFE', textColor: '#3C3489' },
+  { key: '2차면접',     label: '2차면접',     color: '#185FA5', bg: '#E6F1FB', textColor: '#0C447C' },
+  { key: '최종합격',    label: '최종합격',    color: '#3B6D11', bg: '#EAF3DE', textColor: '#27500A' },
+  { key: '불합격',      label: '불합격',      color: '#A32D2D', bg: '#FCEBEB', textColor: '#A32D2D' },
 ];
 
 const AV_COLORS=[{bg:'#EEEDFE',color:'#3C3489'},{bg:'#E1F5EE',color:'#085041'},{bg:'#FAEEDA',color:'#633806'},{bg:'#E6F1FB',color:'#0C447C'},{bg:'#EAF3DE',color:'#27500A'},{bg:'#FCEBEB',color:'#A32D2D'}];
@@ -963,22 +962,13 @@ async function passApplicant() {
     updateModalStage('1차면접');
 
   } else if (stage === '1차면접') {
-    // 면접관 전원 승인 확인 후 면접관검토로
-    await handleInterviewApproval(currentAppId, app);
-
-  } else if (stage === '면접관검토') {
-    // superadmin/manager → 2차면접 여부 확인
-    showConfirm('합격 처리', '2차 면접이 필요한 지원자인가요?', async (yes) => {
-      if (yes) {
-        await updateStageById(currentAppId, '2차면접');
-        showToast('✓ 2차면접으로 이동했습니다');
-        updateModalStage('2차면접');
-      } else {
-        await updateStageById(currentAppId, '최종합격');
-        showToast('🎉 최종합격 처리되었습니다');
-        updateModalStage('최종합격');
-      }
-    });
+    // 슈퍼어드민이면 면접관 전원OK 여부 확인 후 2차면접 팝업
+    if (role === 'superadmin') {
+      await handleInterviewApproval(currentAppId, app);
+    } else {
+      // 일반 관리자/면접관: 개별 승인만
+      await handleInterviewApproval(currentAppId, app);
+    }
 
   } else if (stage === '2차면접') {
     await updateStageById(currentAppId, '최종합격');
@@ -990,9 +980,9 @@ async function passApplicant() {
 
   } else {
     // 불합격 → 복구
-    await updateStageById(currentAppId, '관리자검토');
-    showToast('✓ 관리자 검토로 복구했습니다');
-    updateModalStage('관리자검토');
+    await updateStageById(currentAppId, '지원완료');
+    showToast('✓ 지원완료 단계로 복구했습니다');
+    updateModalStage('지원완료');
   }
 }
 
@@ -1044,10 +1034,22 @@ async function handleInterviewApproval(appId, app) {
   }).join('');
 
   if (done >= total) {
-    // 전원 승인 → 면접관검토로
-    await updateStageById(appId, '면접관검토');
-    showToast(`✓ 면접관 전원 승인 완료! 면접관 검토 단계로 이동했습니다`);
-    updateModalStage('면접관검토');
+    // 전원 승인 완료 → 슈퍼어드민이면 바로 2차면접 여부 팝업, 아니면 알림만
+    if (adminProfile?.role === 'superadmin') {
+      showConfirm('면접관 전원 승인 완료 ✅', '2차 면접이 필요한 지원자인가요?', async (yes) => {
+        if (yes) {
+          await updateStageById(appId, '2차면접');
+          showToast('✓ 2차면접으로 이동했습니다');
+          updateModalStage('2차면접');
+        } else {
+          await updateStageById(appId, '최종합격');
+          showToast('🎉 최종합격 처리되었습니다');
+          updateModalStage('최종합격');
+        }
+      });
+    } else {
+      showToast('✓ 면접관 전원 승인 완료! 슈퍼어드민이 최종 결정합니다');
+    }
   } else {
     // 아직 미승인자 있음 → 현황 표시
     showConfirm(`면접관 승인 현황 (${done}/${total})`, '', null);
@@ -1567,7 +1569,6 @@ const DISPATCH_PIPELINE = [
   { key: '지원',       label: '지원자',      color: '#888780', bg: '#F1EFE8', textColor: '#5F5E5A' },
   { key: '관리자검토', label: '관리자 검토', color: '#B25C00', bg: '#FEF3E2', textColor: '#7A3D00' },
   { key: '1차면접',    label: '1차면접',     color: '#534AB7', bg: '#EEEDFE', textColor: '#3C3489' },
-  { key: '면접관검토', label: '면접관 검토', color: '#0C6E8A', bg: '#E0F4FA', textColor: '#084F63' },
   { key: '합격',       label: '합격',        color: '#3B6D11', bg: '#EAF3DE', textColor: '#27500A' },
   { key: '불합격',     label: '불합격',      color: '#A32D2D', bg: '#FCEBEB', textColor: '#A32D2D' },
 ];
@@ -1726,10 +1727,6 @@ async function passDispatchCandidate(id) {
   } else if (stage === '1차면접') {
     await handleDispatchInterviewApproval(id, cand);
 
-  } else if (stage === '면접관검토') {
-    await updateDispatchStage(id, '합격');
-    showToast('🎉 합격 처리되었습니다');
-
   } else if (stage === '합격') {
     showToast('이미 합격 상태입니다');
   }
@@ -1774,8 +1771,16 @@ async function handleDispatchInterviewApproval(candId, cand) {
   }).join('');
 
   if (done >= total) {
-    await updateDispatchStage(candId, '면접관검토');
-    showToast('✓ 면접관 전원 승인! 면접관 검토 단계로 이동했습니다');
+    if (adminProfile?.role === 'superadmin') {
+      // 파견직은 2차면접 없음 → 바로 최종합격 확인
+      showConfirm('면접관 전원 승인 완료 ✅', '파견직 최종 합격 처리하시겠습니까?', async (yes) => {
+        if (!yes) return;
+        await updateDispatchStage(candId, '합격');
+        showToast('🎉 최종 합격 처리되었습니다');
+      });
+    } else {
+      showToast('✓ 면접관 전원 승인 완료! 슈퍼어드민이 최종 결정합니다');
+    }
   } else {
     showConfirm(`면접관 승인 현황 (${done}/${total})`, '', null);
     document.getElementById('confirmSub').innerHTML = `<div style="margin-top:8px">${statusLines}</div><div style="margin-top:12px;font-size:12px;color:var(--text3)">전원 승인 시 자동으로 다음 단계로 이동합니다</div>`;
