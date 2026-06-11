@@ -61,10 +61,11 @@ function formatTime(t) {
   return `${hour < 12 ? '오전' : '오후'} ${hour <= 12 ? hour : hour-12}:${m}`;
 }
 
+const EXPIRE_HOURS = 2; // 선택 제한 시간
+
 async function init() {
   if (!token) { showError('유효하지 않은 링크입니다'); return; }
 
-  // 토큰으로 선택 정보 조회
   const { data: sel } = await sb.from('interview_selections')
     .select('*, applications(name, email), dispatch_candidates(name)')
     .eq('token', token).maybeSingle();
@@ -72,30 +73,54 @@ async function init() {
   if (!sel) { showError('유효하지 않은 링크이거나 만료되었습니다'); return; }
   selectionId = sel.id;
 
-  // 이미 선택했으면
+  // 이미 선택 완료
   if (sel.slot_id) {
     const { data: slot } = await sb.from('interview_slots').select('*').eq('id', sel.slot_id).single();
     showAlreadySelected(sel, slot);
     return;
   }
 
-  // 확정 슬롯 로드
+  // 만료 체크 (expires_at 기준, 없으면 created_at + 2시간)
+  const createdAt = new Date(sel.created_at || Date.now());
+  const expiresAt = sel.expires_at ? new Date(sel.expires_at) : new Date(createdAt.getTime() + EXPIRE_HOURS * 60 * 60 * 1000);
+  if (new Date() > expiresAt) {
+    showError('면접 일정 선택 시간이 만료되었습니다.\n\n담당자에게 연락해 주세요.\n📞 02-2188-3565');
+    return;
+  }
+
+  // 만료까지 남은 시간 표시용 타이머 세팅
+  window._expiresAt = expiresAt;
+
   const appId = sel.application_id || sel.dispatch_candidate_id;
   const col = sel.application_id ? 'application_id' : 'dispatch_candidate_id';
   const { data: slots } = await sb.from('interview_slots')
     .select('*').eq(col, appId).eq('is_confirmed', true).order('slot_date').order('slot_time');
 
-  if (!slots?.length) { showError('아직 확정된 면접 일정이 없습니다.\n담당자에게 문의해주세요.'); return; }
+  if (!slots?.length) { showError('아직 확정된 면접 일정이 없습니다.\n담당자에게 문의해주세요.\n📞 02-2188-3565'); return; }
 
   const name = sel.applications?.name || sel.dispatch_candidates?.name || '지원자';
   showSlots(name, slots);
 }
 
 function showSlots(name, slots) {
+  // 남은 시간 카운트다운
+  const startTimer = () => {
+    const el = document.getElementById('timerBadge');
+    if (!el || !window._expiresAt) return;
+    const diff = Math.max(0, window._expiresAt - new Date());
+    const h = Math.floor(diff/3600000);
+    const m = Math.floor((diff%3600000)/60000);
+    const s = Math.floor((diff%60000)/1000);
+    el.textContent = `⏱ 선택 가능 시간: ${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    if (diff <= 0) { el.textContent = '⏱ 시간 만료'; el.style.background = '#FCEBEB'; el.style.color = '#A32D2D'; document.getElementById('confirmBtn').disabled = true; }
+    else setTimeout(startTimer, 1000);
+  };
+
   document.getElementById('app').innerHTML = `
     <div class="logo">엘앤티렉서스(주) 채용</div>
-    <h1>면접 일정 선택</h1>
-    <div class="sub">${name}님, 아래 면접 후보 일정 중 참석 가능한 시간을 선택해 주세요.</div>
+    <h1>🎉 서류전형 합격을 축하드립니다!</h1>
+    <div class="sub">${name}님, 서류전형에 합격하셨습니다.<br>아래 면접 후보 일정 중 참석 가능한 시간을 <strong>선택</strong>해 주세요.</div>
+    <div id="timerBadge" style="background:#FEF3E2;color:#7A3D00;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;text-align:center;margin-bottom:16px">⏱ 로딩 중...</div>
     <div id="slotList">
       ${slots.map(s => `
         <div class="slot" id="slot-${s.id}" onclick="selectSlot('${s.id}')">
@@ -112,7 +137,13 @@ function showSlots(name, slots) {
     <div class="divider"></div>
     <button class="btn btn-primary" id="confirmBtn" onclick="confirmSelection()" disabled>선택 완료</button>
     <div style="font-size:12px;color:#999;text-align:center;margin-top:12px">선택 후 변경이 어렵습니다. 신중하게 선택해 주세요.</div>
+    <div style="margin-top:20px;padding:14px;background:#F5F4F0;border-radius:10px;text-align:center">
+      <div style="font-size:12px;color:#666;font-weight:600">엘앤티렉서스(주) 채용담당자</div>
+      <div style="font-size:14px;color:#1a1a1a;font-weight:700;margin-top:4px">📞 02-2188-3565</div>
+      <div style="font-size:11px;color:#999;margin-top:4px">문의사항이 있으시면 연락해 주세요</div>
+    </div>
   `;
+  setTimeout(startTimer, 100);
 }
 
 function selectSlot(id) {
@@ -149,7 +180,11 @@ function showSuccess(date, time) {
         선택하신 일정으로 면접이 진행됩니다.<br>
         <strong>${date}</strong><br>
         <strong>${time}</strong><br><br>
-        추가 안내는 이메일로 발송드립니다.
+        추가 안내는 이메일로 발송드립니다.<br><br>
+        <div style="margin-top:12px;padding:12px;background:#F5F4F0;border-radius:10px">
+          <div style="font-size:12px;font-weight:600">엘앤티렉서스(주) 채용담당자</div>
+          <div style="font-size:14px;font-weight:700;margin-top:4px">📞 02-2188-3565</div>
+        </div>
       </div>
     </div>
   `;

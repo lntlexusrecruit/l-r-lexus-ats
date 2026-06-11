@@ -94,6 +94,28 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .app-card-tag{font-size:10px;padding:2px 7px;border-radius:20px;background:var(--surface2);color:var(--text2)}
 .app-card-date{font-size:10px;color:var(--text3);margin-top:6px}
 
+/* 면접 진행 */
+.iv-room-group{margin-bottom:24px}
+.iv-room-date{font-size:14px;font-weight:700;color:#1a1a1a;padding:10px 0 8px;border-bottom:2px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.iv-room-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:10px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:all .15s}
+.iv-room-card:hover{border-color:var(--accent);box-shadow:0 2px 12px rgba(83,74,183,.1)}
+.iv-room-time{font-size:15px;font-weight:700;color:#534AB7;min-width:90px}
+.iv-room-name{font-size:16px;font-weight:700;color:#1a1a1a}
+.iv-room-job{font-size:12px;color:#666;margin-top:2px}
+.iv-room-status{margin-left:auto;font-size:12px;padding:4px 12px;border-radius:20px;font-weight:600;white-space:nowrap}
+/* 면접 세션 */
+.iv-session-grid{display:grid;grid-template-columns:1fr 400px;gap:20px;height:calc(100vh - 120px)}
+.iv-resume-panel{overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.iv-eval-panel{display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+.iv-pass-btn{padding:20px;font-size:18px;font-weight:700;border:none;border-radius:var(--radius);cursor:pointer;transition:all .15s;flex:1}
+.iv-pass-btn:hover{transform:scale(1.02)}
+.eval-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.eval-title{font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:12px}
+.eval-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.eval-label{font-size:13px;color:#333;font-weight:500}
+.eval-stars{display:flex;gap:4px}
+.eval-star{font-size:22px;cursor:pointer;transition:transform .1s;user-select:none}
+.eval-star:hover{transform:scale(1.2)}
 /* 공고 대시보드 */
 .job-dash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:4px 0}
 .job-dash-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:28px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
@@ -276,6 +298,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         <div class="sb-label" id="recruitMenuLabel">채용 관리</div>
         <div id="recruitMenu">
           <button class="sb-link active" id="sbDashboard" onclick="showPage('dashboard',this)">⊡ 공고 현황 <span class="sb-badge" id="sbTotal">0</span></button>
+          <button class="sb-link" onclick="showPage('interviewroom',this)">🎤 면접 진행 <span class="sb-badge" id="sbInterview">0</span></button>
           <button class="sb-link" onclick="showPage('jobs',this)">⊞ 채용 공고 <span class="sb-badge" id="sbJobs">0</span></button>
           <div id="superOnlyMenu" class="hidden">
             <button class="sb-link" onclick="showPage('candidates',this)">☰ 지원자 관리</button>
@@ -283,7 +306,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
           </div>
         </div>
         <div class="sb-label" style="margin-top:8px">파견직</div>
-        <button class="sb-link" id="dispatchMenu" onclick="showPage('dispatch',this)">🚌 파견직 관리 <span class="sb-badge" id="sbDispatch">0</span></button>
+        <button class="sb-link" id="dispatchMenu" onclick="showPage('dispatch',this)">🚌 파견직 채용공고 <span class="sb-badge" id="sbDispatch">0</span></button>
         <div id="dispatchMgmtMenu">
           <button class="sb-link" id="dispatchAgenciesMenuBtn" onclick="showPage('dispatchagencies',this)">🏢 파견업체 관리</button>
           <button class="sb-link" id="dispatchAdminsMenuBtn" onclick="showPage('dispatchadmins',this)">👤 파견 담당자 관리</button>
@@ -314,6 +337,28 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         </div>
         <div class="content">
           <div id="dashboardContent"><div class="loading"><div class="spinner"></div>불러오는 중...</div></div>
+        </div>
+      </div>
+
+      <!-- 면접 진행 -->
+      <div id="pageInterviewroom" class="hidden">
+        <div class="topbar">
+          <div class="topbar-title">🎤 면접 진행</div>
+          <button class="btn btn-sm" id="refreshIvBtn" onclick="loadInterviewRoom()">↻ 새로고침</button>
+        </div>
+        <div class="content" id="interviewRoomContent">
+          <div class="loading"><div class="spinner"></div>불러오는 중...</div>
+        </div>
+      </div>
+
+      <!-- 면접 세션 (개별 지원자) -->
+      <div id="pageInterviewSession" class="hidden">
+        <div class="topbar">
+          <div class="topbar-title" id="ivSessionTitle">면접 진행 중</div>
+          <button class="btn btn-sm" onclick="showPage('interviewroom', null);loadInterviewRoom()">← 목록으로</button>
+        </div>
+        <div class="content" id="ivSessionContent">
+          <div class="loading"><div class="spinner"></div>불러오는 중...</div>
         </div>
       </div>
 
@@ -414,7 +459,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
       <!-- 파견직 관리 -->
       <div id="pageDispatch" class="hidden">
         <div class="topbar">
-          <div class="topbar-title">파견직 관리</div>
+          <div class="topbar-title">파견직 채용공고</div>
         </div>
         <div class="content" id="dispatchJobList">
           <div class="loading"><div class="spinner"></div>불러오는 중...</div>
@@ -817,13 +862,15 @@ async function showApp() {
     document.getElementById('superOnlyMenu').classList.remove('hidden');
   }
   if (isAgency) {
-    // 파견업체 로그인: 파견직 관리만 보이게
+    // 파견업체 로그인: 파견직 채용공고만 보이게
     document.getElementById('recruitMenu').classList.add('hidden');
     document.getElementById('dispatchMgmtMenu').classList.add('hidden');
-    // superAdminMenu도 숨기기
     const saMenu = document.getElementById('superAdminMenu');
     if (saMenu) saMenu.classList.add('hidden');
-    // 파견직 파이프라인 바로 오픈
+    // 사이드바 라벨도 간소화
+    const recruitLabel = document.getElementById('recruitMenuLabel');
+    if (recruitLabel) recruitLabel.style.display = 'none';
+    // 파견직 채용공고 바로 오픈
     showPage('dispatch', document.getElementById('dispatchMenu'));
     await loadDispatchJobs();
     return;
@@ -833,6 +880,10 @@ async function showApp() {
   allAgencies = agenciesPreload || [];
   await loadJobs();
   await loadApplications();
+  // 면접 진행 배지 업데이트
+  const interviewCount = allApps.filter(a => ['1차면접','2차면접'].includes(a.stage)).length;
+  const sbIv = document.getElementById('sbInterview');
+  if (sbIv) sbIv.textContent = interviewCount || '';
   // 첫 화면은 대시보드
   showPage('dashboard', document.getElementById('sbDashboard'));
   await loadDashboard();
@@ -1227,6 +1278,17 @@ async function passApplicant() {
     await updateStageById(currentAppId, '관리자검토');
     showToast('✓ 관리자 검토 단계로 이동했습니다');
     updateModalStage('관리자검토');
+    // 배정된 관리자들에게 이메일 알림 발송
+    try {
+      const notifyApp = allApps.find(a => a.id === currentAppId);
+      if (notifyApp) {
+        fetch('https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/notify-new-applicant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss' },
+          body: JSON.stringify({ application_id: currentAppId, stage: '관리자검토', applicant_name: notifyApp.name })
+        });
+      }
+    } catch(e) { /* 이메일 실패해도 진행 */ }
 
   } else if (stage === '관리자검토') {
     // 이 공고에 배정된 manager만 1차면접으로 이동 가능
@@ -1717,7 +1779,7 @@ function showPage(name, el) {
   }
   document.querySelectorAll('.sb-link').forEach(l=>l.classList.remove('active'));
   if (el) el.classList.add('active');
-  ['Dashboard','Pipeline','Jobs','Candidates','Stats','Admins','Dispatch','DispatchDetail','DispatchAgencies','DispatchAdmins'].forEach(p=>
+  ['Dashboard','Pipeline','Jobs','Candidates','Stats','Admins','Dispatch','DispatchDetail','DispatchAgencies','DispatchAdmins','Interviewroom','InterviewSession'].forEach(p=>
     document.getElementById('page'+p)?.classList.toggle('hidden', p.toLowerCase()!==name.toLowerCase())
   );
   if(name==='admins') loadAdmins();
@@ -1726,6 +1788,7 @@ function showPage(name, el) {
   if(name==='dispatch') loadDispatchJobs();
   if(name==='dispatchagencies') loadDispatchAgencies();
   if(name==='dispatchadmins') loadDispatchAdmins();
+  if(name==='interviewroom') loadInterviewRoom();
 }
 
 function switchTab(name) {
@@ -2003,11 +2066,10 @@ async function loadDispatchJobs() {
   const role = adminProfile?.role;
   if (role === 'agency') {
     // 파견업체 계정: auth.users.id OR email로 dispatch_agencies 찾기
-    let myAgency = allAgencies.find(a => a.id === currentAdmin.id);
-    if (!myAgency) {
-      // id 불일치 시 email로 fallback
-      myAgency = allAgencies.find(a => a.email === currentAdmin.email);
-    }
+    // DB에서 직접 이메일로 업체 찾기 (캐시 불일치 방지)
+    const { data: myAgencyData } = await sb.from('dispatch_agencies')
+      .select('*').or(`id.eq.${currentAdmin.id},email.eq.${currentAdmin.email}`).maybeSingle();
+    const myAgency = myAgencyData || allAgencies.find(a => a.id === currentAdmin.id || a.email === currentAdmin.email);
     if (!myAgency) {
       c.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>연결된 파견업체 정보가 없습니다<br><small>관리자에게 문의하세요</small></p></div>';
       return;
@@ -2412,10 +2474,46 @@ async function loadDispatchAgencies() {
       </div>
       <div style="display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end">
         <button class="btn btn-sm" onclick="viewAgencyJobs('${a.id}','${safeName}')">공고 보기</button>
+        <button class="btn btn-sm btn-primary" onclick="openAgencyEdit('${a.id}')">수정</button>
         <button class="btn btn-sm btn-danger" onclick="toggleAgencyActive('${a.id}','${safeName}',${a.is_active})">${a.is_active?'비활성화':'활성화'}</button>
       </div>
     </div>`;
   }).join('');
+}
+
+async function openAgencyEdit(agencyId) {
+  const { data: a } = await sb.from('dispatch_agencies').select('*').eq('id', agencyId).single();
+  if (!a) return;
+  showConfirm(`${a.name} 업체 수정`, '', null);
+  document.getElementById('confirmSub').innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">업체명 *</label>
+        <input id="aeCompany" type="text" value="${a.name||''}" style="width:100%;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">이메일</label>
+        <input id="aeEmail" type="email" value="${a.email||''}" style="width:100%;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">담당자명</label>
+        <input id="aeContact" type="text" value="${a.contact_name||''}" style="width:100%;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px"></div>
+      <div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">연락처</label>
+        <input id="aePhone" type="text" value="${a.phone||''}" style="width:100%;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px"></div>
+    </div>`;
+  document.getElementById('confirmYes').textContent = '저장';
+  document.getElementById('confirmYes').style.display = '';
+  document.getElementById('confirmNo').textContent = '취소';
+  document.getElementById('confirmNo').onclick = () => closeConfirmModal();
+  confirmCallback = async (yes) => {
+    if (!yes) return;
+    const name = document.getElementById('aeCompany').value.trim();
+    if (!name) { showToast('업체명을 입력하세요'); return; }
+    const { error } = await sb.from('dispatch_agencies').update({
+      name,
+      email: document.getElementById('aeEmail').value.trim(),
+      contact_name: document.getElementById('aeContact').value.trim(),
+      phone: document.getElementById('aePhone').value.trim()
+    }).eq('id', agencyId);
+    if (error) { showToast('오류: '+error.message); return; }
+    await loadDispatchAgencies();
+    showToast('✓ 업체 정보 수정 완료');
+  };
 }
 
 async function toggleAgencyActive(id, name, isActive) {
@@ -2589,6 +2687,316 @@ async function saveDispatchAdmin() {
   await loadDispatchAdmins();
   showToast('✓ 파견 담당자 추가 완료');
 }
+
+// ══════════════════════════════════════════════════════
+// 면접 진행 (Interview Room)
+// ══════════════════════════════════════════════════════
+async function loadInterviewRoom() {
+  const c = document.getElementById('interviewRoomContent');
+  c.innerHTML = '<div class="loading"><div class="spinner"></div>불러오는 중...</div>';
+
+  // 1차/2차 면접 단계 지원자 + 확정된 면접 일정
+  const role = adminProfile?.role;
+  let appsQuery = sb.from('applications')
+    .select('*, job_postings(title, department)')
+    .in('stage', ['1차면접','2차면접'])
+    .order('submitted_at');
+
+  if (role !== 'superadmin') {
+    const { data: perms } = await sb.from('admin_job_permissions').select('job_posting_id').eq('admin_id', currentAdmin.id);
+    const ids = (perms||[]).map(p => p.job_posting_id);
+    if (!ids.length) { c.innerHTML = '<div class="empty-state"><div class="icon">🎤</div><p>배정된 면접이 없습니다</p></div>'; return; }
+    appsQuery = appsQuery.in('job_posting_id', ids);
+  }
+
+  const { data: apps } = await appsQuery;
+  if (!apps?.length) { c.innerHTML = '<div class="empty-state"><div class="icon">🎤</div><p>현재 면접 진행 중인 지원자가 없습니다</p></div>'; return; }
+
+  // 각 지원자의 확정 면접 일정 로드
+  const appIds = apps.map(a => a.id);
+  const { data: selections } = await sb.from('interview_selections')
+    .select('*, interview_slots(*)')
+    .in('application_id', appIds);
+  const { data: slots } = await sb.from('interview_slots')
+    .select('*').in('application_id', appIds).eq('is_confirmed', true);
+
+  // 날짜별 그룹핑
+  const byDate = {};
+  apps.forEach(app => {
+    const sel = (selections||[]).find(s => s.application_id === app.id);
+    const slot = sel?.interview_slots || (slots||[]).find(s => s.application_id === app.id);
+    const date = slot?.slot_date || 'unscheduled';
+    if (!byDate[date]) byDate[date] = [];
+    byDate[date].push({ app, slot });
+  });
+
+  // 오늘/미래 순 정렬
+  const sortedDates = Object.keys(byDate).sort((a,b) => {
+    if (a==='unscheduled') return 1;
+    if (b==='unscheduled') return -1;
+    return a.localeCompare(b);
+  });
+
+  // 면접 배지 수 업데이트
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayCount = (byDate[todayStr]||[]).length;
+  const sbIv = document.getElementById('sbInterview');
+  if (sbIv) sbIv.textContent = todayCount || apps.length;
+
+  let html = '';
+  sortedDates.forEach(date => {
+    const items = byDate[date];
+    const dateLabel = date === 'unscheduled' ? '📋 일정 미지정'
+      : date === todayStr ? `📅 오늘 ${formatSlotDate(date)}`
+      : `📅 ${formatSlotDate(date)}`;
+
+    html += `<div class="iv-room-group">
+      <div class="iv-room-date">${dateLabel} <span style="font-size:12px;font-weight:400;color:var(--text3)">${items.length}명</span></div>
+      ${items.map(({app, slot}) => {
+        const timeStr = slot ? formatSlotTime(slot.slot_time) : '시간 미정';
+        const roundLabel = app.stage === '2차면접' ? '2차' : '1차';
+        const roundColor = app.stage === '2차면접' ? '#185FA5' : '#534AB7';
+        return `<div class="iv-room-card" onclick="openInterviewSession('${app.id}',false)">
+          <div class="iv-room-time">${timeStr}</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="iv-room-name">${app.name}</div>
+              <span style="font-size:11px;background:${roundColor}20;color:${roundColor};padding:2px 8px;border-radius:20px;font-weight:600">${roundLabel}면접</span>
+            </div>
+            <div class="iv-room-job">${app.job_postings?.title||'-'} ${app.job_postings?.department?'· '+app.job_postings.department:''}</div>
+            ${slot?.slot_location?`<div style="font-size:11px;color:#666;margin-top:2px">📍 ${slot.slot_location}</div>`:''}
+          </div>
+          <div class="iv-room-status" style="background:#EEEDFE;color:#534AB7">면접 시작 →</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  });
+
+  c.innerHTML = html;
+}
+
+// ── 면접 세션 (개별 지원자 면접 진행) ─────────────────────────────────────
+let _ivSessionAppId = null, _ivSessionIsDispatch = false, _ivSessionRound = 1;
+
+async function openInterviewSession(appId, isDispatch) {
+  _ivSessionAppId = appId;
+  _ivSessionIsDispatch = isDispatch;
+  showPage('interviewsession', null);
+  const app = isDispatch
+    ? (window._dispatchCands||[]).find(c => c.id === appId)
+    : allApps.find(a => a.id === appId);
+  _ivSessionRound = app?.stage === '2차면접' ? 2 : 1;
+  document.getElementById('ivSessionTitle').textContent = `🎤 ${app?.name||'-'} 면접 진행 중 (${_ivSessionRound}차)`;
+  await renderInterviewSession(app);
+}
+
+async function renderInterviewSession(app) {
+  const c = document.getElementById('ivSessionContent');
+  if (!app) { c.innerHTML = '<div class="empty-state">지원자 정보를 찾을 수 없습니다</div>'; return; }
+
+  // 이력서 데이터 로드
+  const userId = app.user_id;
+  const [
+    { data: edus }, { data: careers }, { data: certs },
+    { data: awards }, { data: langs }, { data: myEval }
+  ] = await Promise.all([
+    sb.from('education').select('*').eq('user_id', userId).order('start_month', {ascending:false}),
+    sb.from('work_experience').select('*').eq('user_id', userId).order('start_month', {ascending:false}),
+    sb.from('certifications').select('*').eq('user_id', userId),
+    sb.from('awards').select('*').eq('user_id', userId),
+    sb.from('language_skills').select('*').eq('user_id', userId),
+    sb.from('interview_evaluations').select('*')
+      .eq(_ivSessionIsDispatch ? 'dispatch_candidate_id' : 'application_id', _ivSessionAppId)
+      .eq('interview_round', _ivSessionRound)
+      .eq('admin_id', currentAdmin.id)
+      .maybeSingle()
+  ]);
+
+  // 합격/불합격 버튼 색상
+  const passBtn = `<button class="iv-pass-btn" style="background:#EAF3DE;color:#27500A" onclick="ivDecision('pass')">✅ 합격</button>`;
+  const failBtn = `<button class="iv-pass-btn" style="background:#FCEBEB;color:#A32D2D" onclick="ivDecision('fail')">❌ 불합격</button>`;
+
+  // 평가 점수 렌더
+  const renderStars = (field, val) => {
+    return [1,2,3,4,5].map(n =>
+      `<span class="eval-star" onclick="setEvalScore('${field}',${n})" id="star_${field}_${n}">${n <= (val||0) ? '⭐' : '☆'}</span>`
+    ).join('');
+  };
+
+  const ev = myEval || {};
+
+  c.innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      ${passBtn}${failBtn}
+    </div>
+    <div class="iv-session-grid">
+      <!-- 왼쪽: 이력서 -->
+      <div class="iv-resume-panel">
+        <div style="font-size:18px;font-weight:700;margin-bottom:4px">${app.name}</div>
+        <div style="font-size:13px;color:#666;margin-bottom:16px">${app.email||''} ${app.phone?'· '+app.phone:''}</div>
+
+        ${edus?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#534AB7">학력</div>
+        ${edus.map(e=>`<div class="exp-card">
+          <div class="exp-title">${e.school}</div>
+          <div class="exp-sub">${[e.major,e.degree].filter(Boolean).join(' · ')}</div>
+          <div class="exp-period">📅 ${e.start_month||''}~${e.end_month||''} ${e.status?'· '+e.status:''}</div>
+        </div>`).join('')}` : ''}
+
+        ${careers?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:12px;color:#534AB7">경력</div>
+        ${careers.map(c => c.is_no_experience ? '<div class="exp-card"><div class="exp-title">신입</div></div>'
+          : `<div class="exp-card">
+              <div class="exp-title">${c.company||'-'}</div>
+              <div class="exp-sub">${[c.department,c.position,c.employment_type].filter(Boolean).join(' · ')}</div>
+              <div class="exp-period">📅 ${c.start_month||''}~${c.is_current?'현재':c.end_month||''}</div>
+              ${c.final_salary?`<div class="exp-salary">💰 최종연봉 ${c.final_salary.toLocaleString()}만원</div>`:''}
+            </div>`).join('')}` : ''}
+
+        ${certs?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:12px;color:#534AB7">자격증</div>
+        ${certs.map(c=>`<div class="exp-card"><div class="exp-title">${c.name}</div><div class="exp-sub">${c.issuer||''} ${c.acquired_date?'· '+c.acquired_date:''}</div></div>`).join('')}` : ''}
+
+        ${langs?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:12px;color:#534AB7">어학</div>
+        ${langs.map(l=>`<div class="exp-card"><div class="exp-title">${l.language} ${l.test_name||''}</div><div class="exp-sub">${l.score||''} ${l.level?'· '+l.level:''}</div></div>`).join('')}` : ''}
+      </div>
+
+      <!-- 오른쪽: 평가표 -->
+      <div class="iv-eval-panel">
+        <div class="eval-card">
+          <div class="eval-title">📝 면접 평가표 (${_ivSessionRound}차)</div>
+          <div class="eval-row">
+            <div class="eval-label">태도/인상</div>
+            <div class="eval-stars" id="stars_attitude">${renderStars('attitude', ev.score_attitude)}</div>
+          </div>
+          <div class="eval-row">
+            <div class="eval-label">의사소통</div>
+            <div class="eval-stars" id="stars_communication">${renderStars('communication', ev.score_communication)}</div>
+          </div>
+          <div class="eval-row">
+            <div class="eval-label">직무지식</div>
+            <div class="eval-stars" id="stars_knowledge">${renderStars('knowledge', ev.score_knowledge)}</div>
+          </div>
+          <div class="eval-row">
+            <div class="eval-label">성장가능성</div>
+            <div class="eval-stars" id="stars_potential">${renderStars('potential', ev.score_potential)}</div>
+          </div>
+          <div class="eval-row">
+            <div class="eval-label">종합평가</div>
+            <div class="eval-stars" id="stars_overall">${renderStars('overall', ev.score_overall)}</div>
+          </div>
+          <div style="margin-top:12px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px">의견</div>
+            <textarea id="evalComment" rows="4" placeholder="면접 중 특이사항, 인상적인 점 등을 기록하세요"
+              style="width:100%;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px;resize:vertical">${ev.comment||''}</textarea>
+          </div>
+          <div style="margin-top:8px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:6px">추천 의견</div>
+            <div style="display:flex;gap:6px">
+              ${['합격','보류','불합격'].map(r=>`<button id="rec_${r}" class="btn btn-sm" style="flex:1;${ev.recommendation===r?'background:var(--accent);color:#fff':''}" onclick="setRecommendation('${r}')">${r}</button>`).join('')}
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="saveEvaluation()">💾 평가 저장</button>
+        </div>
+
+        <!-- 다른 면접관 평가 현황 -->
+        <div class="eval-card" id="otherEvalsCard">
+          <div class="eval-title">👥 면접관 평가 현황</div>
+          <div id="otherEvals" style="font-size:12px;color:var(--text3)">불러오는 중...</div>
+        </div>
+      </div>
+    </div>`;
+
+  // 다른 면접관 평가 로드
+  loadOtherEvals();
+}
+
+// 평가 점수 선택
+let _evalScores = {};
+function setEvalScore(field, val) {
+  _evalScores[field] = val;
+  const container = document.getElementById('stars_'+field);
+  if (!container) return;
+  container.querySelectorAll('.eval-star').forEach((star, i) => {
+    star.textContent = i < val ? '⭐' : '☆';
+  });
+}
+
+let _evalRecommendation = null;
+function setRecommendation(val) {
+  _evalRecommendation = val;
+  ['합격','보류','불합격'].forEach(r => {
+    const btn = document.getElementById('rec_'+r);
+    if (btn) {
+      btn.style.background = r === val ? 'var(--accent)' : '';
+      btn.style.color = r === val ? '#fff' : '';
+    }
+  });
+}
+
+async function saveEvaluation() {
+  const col = _ivSessionIsDispatch ? 'dispatch_candidate_id' : 'application_id';
+  const comment = document.getElementById('evalComment')?.value || '';
+  const payload = {
+    [col]: _ivSessionAppId,
+    interview_round: _ivSessionRound,
+    admin_id: currentAdmin.id,
+    score_attitude: _evalScores.attitude || null,
+    score_communication: _evalScores.communication || null,
+    score_knowledge: _evalScores.knowledge || null,
+    score_potential: _evalScores.potential || null,
+    score_overall: _evalScores.overall || null,
+    comment,
+    recommendation: _evalRecommendation,
+    updated_at: new Date().toISOString()
+  };
+  const { error } = await sb.from('interview_evaluations').upsert(payload, {
+    onConflict: `${col},interview_round,admin_id`
+  });
+  if (error) { showToast('오류: '+error.message); return; }
+  showToast('✓ 평가 저장 완료');
+  loadOtherEvals();
+}
+
+async function loadOtherEvals() {
+  const el = document.getElementById('otherEvals');
+  if (!el) return;
+  const col = _ivSessionIsDispatch ? 'dispatch_candidate_id' : 'application_id';
+  const { data: evals } = await sb.from('interview_evaluations')
+    .select('*, admin_profiles(name)')
+    .eq(col, _ivSessionAppId)
+    .eq('interview_round', _ivSessionRound);
+
+  if (!evals?.length) { el.textContent = '아직 등록된 평가 없음'; return; }
+  const scoreLabel = s => s ? '⭐'.repeat(s) + '☆'.repeat(5-s) : '-';
+  el.innerHTML = evals.map(e => `
+    <div style="border-bottom:0.5px solid var(--border);padding:8px 0">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-weight:600">${e.admin_profiles?.name||'-'}</span>
+        <span style="color:${e.recommendation==='합격'?'#27500A':e.recommendation==='불합격'?'#A32D2D':'#7A3D00'};font-weight:600">${e.recommendation||'-'}</span>
+      </div>
+      <div style="font-size:11px;color:#444">종합: ${scoreLabel(e.score_overall)}</div>
+      ${e.comment?`<div style="font-size:11px;color:#666;margin-top:3px">${e.comment}</div>`:''}
+    </div>`).join('');
+}
+
+async function ivDecision(decision) {
+  const app = allApps.find(a => a.id === _ivSessionAppId);
+  const name = app?.name || '지원자';
+  const label = decision === 'pass' ? '합격' : '불합격';
+  const color = decision === 'pass' ? '#27500A' : '#A32D2D';
+
+  showConfirm(`${name} - ${label} 처리`, `${_ivSessionRound}차 면접 ${label} 처리하시겠습니까?`, async (yes) => {
+    if (!yes) return;
+    if (decision === 'pass') {
+      await passApplicant();
+    } else {
+      await failApplicant();
+    }
+    // 면접 진행 목록으로 복귀
+    showPage('interviewroom', null);
+    await loadInterviewRoom();
+    showToast(`✓ ${name} ${label} 처리 완료`);
+  });
+}
+
 // 슈퍼파견담당자 체크박스 토글
 function toggleDAdPerms() {
   const isSuper = document.getElementById('dAdIsSuper').checked;
@@ -2598,20 +3006,25 @@ function toggleDAdPerms() {
 
 
 // ══════════════════════════════════════════════════════
-// 면접 일정 패널
+// 면접 일정 패널 (전면 재작성)
 // ══════════════════════════════════════════════════════
 let _schedAppId = null, _schedIsDispatch = false, _schedRound = 1;
 let _schedCalYear = null, _schedCalMonth = null;
-let _schedSelectedDate = null, _schedSlots = [], _schedAvailability = [];
+let _schedSelectedDates = new Set(); // 다중 날짜 선택
+let _schedSlots = [], _schedAvailability = [];
+let _schedAppName = '', _schedJobTitle = '';
 
 async function openSchedulePanel(id, app, isDispatch) {
   _schedAppId = id;
   _schedIsDispatch = isDispatch;
   _schedRound = app.stage === '2차면접' ? 2 : 1;
+  _schedSelectedDates = new Set();
+  _schedCalYear = null; _schedCalMonth = null;
+  _schedAppName = app.name || '-';
+  _schedJobTitle = isDispatch ? '파견직' : (app.job_postings?.title || '-');
   const panel = document.getElementById('schedulePanel');
   panel.style.display = 'flex';
-  document.getElementById('schedulePanelSub').textContent = (app.name||'-') + ' · ' + (isDispatch ? '파견직' : (app.job_postings?.title||'-'));
-  // 탭 상태
+  document.getElementById('schedulePanelSub').textContent = _schedAppName + ' · ' + _schedJobTitle;
   switchScheduleTab(_schedRound, false);
   await loadSchedulePanel();
 }
@@ -2633,8 +3046,8 @@ async function loadSchedulePanel() {
   const body = document.getElementById('schedulePanelBody');
   body.innerHTML = '<div class="loading"><div class="spinner"></div>불러오는 중...</div>';
   const col = _schedIsDispatch ? 'dispatch_candidate_id' : 'application_id';
+  if (!_schedCalYear) { const now = new Date(); _schedCalYear = now.getFullYear(); _schedCalMonth = now.getMonth(); }
 
-  // 슬롯 & 면접관 가능시간 로드
   const [{ data: slots }, { data: avail }, { data: selection }] = await Promise.all([
     sb.from('interview_slots').select('*, admin_profiles(name)').eq(col, _schedAppId).eq('interview_round', _schedRound).order('slot_date').order('slot_time'),
     sb.from('interviewer_availability').select('*, admin_profiles(name)').eq(col, _schedAppId).order('slot_date').order('slot_time'),
@@ -2647,75 +3060,84 @@ async function loadSchedulePanel() {
   const confirmed = _schedSlots.filter(s => s.is_confirmed);
   const selectedSlot = selection?.[0];
 
-  // 캘린더 초기화
-  if (!_schedCalYear) { const now = new Date(); _schedCalYear = now.getFullYear(); _schedCalMonth = now.getMonth(); }
+  // ── 면접관 목록 로드 ──────────────────────────────────
+  let allInterviewers = [];
+  if (_schedIsDispatch) {
+    const cand = (window._dispatchCands||[]).find(c => c.id === _schedAppId);
+    const { data: dIvs } = await sb.from('dispatch_job_interviewers')
+      .select('admin_id, admin_profiles(name)').eq('dispatch_posting_id', cand?.dispatch_posting_id||'');
+    allInterviewers = dIvs || [];
+  } else {
+    const app = allApps.find(a => a.id === _schedAppId);
+    allInterviewers = (window._jobInterviewers1st||[]).filter(i => i.job_id === app?.job_posting_id);
+    if (!allInterviewers.length && app?.job_posting_id) {
+      const { data: jIvs } = await sb.from('job_interviewers').select('admin_id, admin_profiles(name), job_id').eq('job_id', app.job_posting_id);
+      allInterviewers = jIvs || [];
+    }
+  }
+  const isInterviewer = allInterviewers.some(i => i.admin_id === myId);
 
-  // HTML 빌드
+  // ── A. 지원자 선택 완료 표시 ─────────────────────────
+  const finalSection = selectedSlot ? `
+    <div style="padding:14px;background:#EEEDFE;border-radius:var(--rsm);margin-bottom:16px;text-align:center">
+      <div style="font-size:12px;color:#534AB7;font-weight:700;margin-bottom:4px">🎉 지원자 확정 완료</div>
+      <div style="font-size:15px;font-weight:700;color:#1a1a1a">${formatSlotDate(selectedSlot.interview_slots?.slot_date)}</div>
+      <div style="font-size:14px;color:#534AB7;font-weight:600">${formatSlotTime(selectedSlot.interview_slots?.slot_time)}</div>
+      ${selectedSlot.interview_slots?.slot_location?`<div style="font-size:12px;color:#444;margin-top:4px">📍 ${selectedSlot.interview_slots.slot_location}</div>`:''}
+    </div>` : '';
+
+  // ── B. 확정 후보 슬롯 표시 ───────────────────────────
   const confirmedSection = confirmed.length ? `
     <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;color:#3B6D11;margin-bottom:8px">✅ 확정된 후보 시간</div>
-      ${confirmed.map(s => {
-        const isSelected = selectedSlot?.slot_id === s.id;
-        return `<div class="slot-card ${isSelected?'selected':'confirmed'}">
+      <div style="font-size:12px;font-weight:700;color:#3B6D11;margin-bottom:8px">✅ 지원자 발송 후보 (${confirmed.length}개)</div>
+      ${confirmed.map(s => `
+        <div class="slot-card ${selectedSlot?.slot_id===s.id?'selected':'confirmed'}" style="margin-bottom:6px">
           <div style="display:flex;align-items:center;justify-content:space-between">
             <div>
               <div class="slot-time">${formatSlotDate(s.slot_date)} ${formatSlotTime(s.slot_time)}</div>
-              ${s.slot_location ? `<div class="slot-location">📍 ${s.slot_location}</div>` : ''}
-              ${isSelected ? '<div style="font-size:11px;font-weight:600;color:var(--accent);margin-top:4px">✓ 지원자 선택</div>' : ''}
+              ${s.slot_location?`<div class="slot-location">📍 ${s.slot_location}</div>`:''}
+              ${selectedSlot?.slot_id===s.id?'<div style="font-size:11px;color:var(--accent);font-weight:600;margin-top:2px">✓ 지원자 선택</div>':''}
             </div>
-            ${isSuperAdmin && !selectedSlot ? `<button class="btn btn-sm btn-danger" onclick="removeSlot('${s.id}')">삭제</button>` : ''}
+            ${isSuperAdmin&&!selectedSlot?`<button class="btn btn-sm btn-danger" onclick="removeSlot('${s.id}')">삭제</button>`:''}
           </div>
-        </div>`;
-      }).join('')}
-      ${!selectedSlot && isSuperAdmin ? `<button class="btn btn-sm btn-primary" style="width:100%;margin-top:4px" onclick="sendScheduleEmail()">📧 지원자에게 발송</button>` : ''}
-      ${selectedSlot ? `<div style="padding:10px;background:#EEEDFE;border-radius:var(--rxs);font-size:13px;color:#3C3489;font-weight:600;text-align:center;margin-top:8px">🎉 확정: ${formatSlotDate(selectedSlot.interview_slots?.slot_date)} ${formatSlotTime(selectedSlot.interview_slots?.slot_time)}</div>` : ''}
+        </div>`).join('')}
+      ${isSuperAdmin&&!selectedSlot?`
+        <button class="btn btn-primary btn-sm" style="width:100%;margin-top:6px;padding:10px" onclick="sendScheduleEmail()">
+          📧 지원자에게 발송 (선택 링크 전송)
+        </button>`:''}
     </div>` : '';
 
-  // 면접관 가능시간 현황
-  const allInterviewers = (_schedIsDispatch
-    ? (window._jobInterviewers1st||[]).filter(i => i.job_id === (_schedIsDispatch ? null : null)) // dispatch용은 별도
-    : (window._jobInterviewers1st||[]).filter(i => {
-        const app = allApps.find(a => a.id === _schedAppId);
-        return i.job_id === app?.job_posting_id;
-      })
-  );
-  const availSummary = allInterviewers.length ? `
-    <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:8px">👥 면접관 가능시간</div>
-      ${allInterviewers.map(iv => {
-        const myAvail = _schedAvailability.filter(a => a.admin_id === iv.admin_id);
-        const isMe = iv.admin_id === myId;
-        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs);margin-bottom:6px">
-          <div>
-            <div style="font-size:13px;font-weight:500">${iv.admin_profiles?.name||'-'} ${isMe?'<span style="font-size:10px;color:var(--accent)">(나)</span>':''}</div>
-            <div style="font-size:11px;color:var(--text3);margin-top:2px">${myAvail.length}개 입력됨</div>
-          </div>
-          ${isMe ? `<button class="btn btn-sm btn-primary" onclick="openMyAvailability()">+ 입력</button>` : ''}
-        </div>`;
-      }).join('')}
-    </div>` : '';
+  // ── C. 슈퍼어드민: 면접관 가능시간 현황 + 중복 확인 ─
+  const overlapSection = isSuperAdmin ? buildOverlapSection(allInterviewers) : '';
 
-  // 슬롯 추가 섹션 (슈퍼어드민)
+  // ── D. 슈퍼어드민: 직접 슬롯 추가 ──────────────────
   const addSlotSection = isSuperAdmin ? `
     <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:8px">📅 후보 시간 추가</div>
+      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:8px">📅 후보 시간 직접 추가</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">날짜 여러 개 선택 후 한번에 추가 가능</div>
       ${renderMiniCalendar()}
-      ${_schedSelectedDate ? `
+      ${_schedSelectedDates.size > 0 ? `
         <div style="margin-top:10px;padding:12px;background:var(--surface2);border-radius:var(--rxs)">
-          <div style="font-size:12px;font-weight:600;color:#1a1a1a;margin-bottom:8px">${_schedSelectedDate} 시간 추가</div>
-          <div style="display:flex;gap:6px;margin-bottom:6px">
-            <input type="time" id="slotTime" style="flex:1;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px" value="10:00">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px">선택된 날짜 (${_schedSelectedDates.size}개)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+            ${[..._schedSelectedDates].sort().map(d=>`<span style="font-size:11px;background:#EEEDFE;color:#534AB7;padding:2px 8px;border-radius:20px">${formatSlotDate(d)}</span>`).join('')}
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">
+            <span style="font-size:12px;font-weight:500;white-space:nowrap">시작</span>
+            <input type="time" id="slotTimeStart" value="10:00" style="flex:1;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px">
+            <span style="font-size:12px;font-weight:500;white-space:nowrap">~ 종료</span>
+            <input type="time" id="slotTimeEnd" value="11:00" style="flex:1;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px">
           </div>
           <input type="text" id="slotLocation" placeholder="장소 (예: 본사 2층 회의실A)" style="width:100%;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px;margin-bottom:8px;box-sizing:border-box">
-          <button class="btn btn-primary btn-sm" style="width:100%" onclick="addSlot()">+ 추가</button>
-        </div>` : '<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">날짜를 클릭해서 시간을 추가하세요</div>'}
+          <button class="btn btn-primary btn-sm" style="width:100%" onclick="addSlots()">+ ${_schedSelectedDates.size}개 날짜 추가</button>
+        </div>` : `<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">날짜를 클릭해서 선택 (여러 개 가능)</div>`}
       ${_schedSlots.filter(s=>!s.is_confirmed).length ? `
-        <div style="margin-top:10px">
-          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px">미확정 슬롯</div>
-          ${_schedSlots.filter(s=>!s.is_confirmed).map(s => `
-            <div class="slot-card" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px">
+        <div style="margin-top:12px">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);margin-bottom:6px">미확정 슬롯 — 확정하면 지원자 발송 목록에 포함</div>
+          ${_schedSlots.filter(s=>!s.is_confirmed).map(s=>`
+            <div class="slot-card" style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;margin-bottom:4px">
               <div>
-                <div class="slot-time" style="font-size:13px">${formatSlotDate(s.slot_date)} ${formatSlotTime(s.slot_time)}</div>
+                <div class="slot-time" style="font-size:13px">${formatSlotDate(s.slot_date)} ${formatSlotTime(s.slot_time)}${s.slot_time_end?' ~ '+formatSlotTime(s.slot_time_end):''}</div>
                 ${s.slot_location?`<div class="slot-location">${s.slot_location}</div>`:''}
               </div>
               <div style="display:flex;gap:4px">
@@ -2726,28 +3148,101 @@ async function loadSchedulePanel() {
         </div>` : ''}
     </div>` : '';
 
-  // 내 가용시간 입력 섹션 (면접관)
-  const myAvailSection = allInterviewers.some(i => i.admin_id === myId) && !isSuperAdmin ? `
+  // ── E. 면접관: 내 가능시간 입력 ─────────────────────
+  const myAvailSection = isInterviewer && !isSuperAdmin ? `
     <div style="margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:8px">내 가능 시간 입력</div>
+      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:8px">📅 내 면접 가능 시간</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:8px">날짜 여러 개 선택 후 한번에 추가 가능</div>
       ${renderMiniCalendar()}
-      ${_schedSelectedDate ? `
+      ${_schedSelectedDates.size > 0 ? `
         <div style="margin-top:10px;padding:12px;background:var(--surface2);border-radius:var(--rxs)">
-          <div style="font-size:12px;font-weight:600;margin-bottom:6px">${_schedSelectedDate}</div>
-          <input type="time" id="availTime" style="width:100%;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px;margin-bottom:8px" value="10:00">
-          <button class="btn btn-primary btn-sm" style="width:100%" onclick="addMyAvailability()">가능시간 추가</button>
-        </div>` : '<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">날짜를 클릭하세요</div>'}
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px">선택된 날짜 (${_schedSelectedDates.size}개)</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+            ${[..._schedSelectedDates].sort().map(d=>`<span style="font-size:11px;background:#EEEDFE;color:#534AB7;padding:2px 8px;border-radius:20px">${formatSlotDate(d)}</span>`).join('')}
+          </div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
+            <span style="font-size:12px;font-weight:500;white-space:nowrap">가능시간</span>
+            <input type="time" id="availTimeStart" value="09:00" style="flex:1;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px">
+            <span style="font-size:12px;white-space:nowrap">~</span>
+            <input type="time" id="availTimeEnd" value="18:00" style="flex:1;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px">
+          </div>
+          <button class="btn btn-primary btn-sm" style="width:100%" onclick="addMyAvailabilities()">가능시간 추가</button>
+        </div>` : `<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">날짜를 클릭하세요 (여러 개 선택 가능)</div>`}
       <div style="margin-top:8px">
         ${_schedAvailability.filter(a=>a.admin_id===myId).map(a=>`
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;border:0.5px solid var(--border);border-radius:var(--rxs);margin-bottom:4px;font-size:12px">
-            <span>${formatSlotDate(a.slot_date)} ${formatSlotTime(a.slot_time)}</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;border:0.5px solid var(--border);border-radius:var(--rxs);margin-bottom:4px;font-size:12px">
+            <span>${formatSlotDate(a.slot_date)} ${formatSlotTime(a.slot_time)}${a.slot_time_end?' ~ '+formatSlotTime(a.slot_time_end):''}</span>
             <button class="btn btn-sm btn-danger" style="padding:2px 8px;font-size:11px" onclick="removeMyAvailability('${a.id}')">삭제</button>
           </div>`).join('')}
       </div>
     </div>` : '';
 
-  body.innerHTML = confirmedSection + availSummary + addSlotSection + myAvailSection ||
-    '<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">등록된 일정이 없습니다</div>';
+  body.innerHTML = finalSection + confirmedSection + overlapSection + addSlotSection + myAvailSection;
+  if (!body.innerHTML.trim()) body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">면접 일정 패널<br>날짜/시간을 추가하세요</div>';
+}
+
+// 슈퍼어드민용: 면접관 가능시간 중복 분석
+function buildOverlapSection(allInterviewers) {
+  if (!allInterviewers.length || !_schedAvailability.length) return '';
+
+  // 날짜별 그룹핑
+  const byDate = {};
+  _schedAvailability.forEach(a => {
+    if (!byDate[a.slot_date]) byDate[a.slot_date] = [];
+    byDate[a.slot_date].push(a);
+  });
+
+  // 2명 이상 겹치는 날짜만 표시
+  const overlapDates = Object.entries(byDate)
+    .filter(([_, avails]) => {
+      const uniqueAdmins = new Set(avails.map(a => a.admin_id));
+      return uniqueAdmins.size >= 2;
+    })
+    .sort(([a],[b]) => a.localeCompare(b));
+
+  if (!overlapDates.length) {
+    return `<div style="margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:8px">👥 면접관 가능시간 현황</div>
+      ${allInterviewers.map(iv => {
+        const myAvail = _schedAvailability.filter(a => a.admin_id === iv.admin_id);
+        return `<div style="display:flex;justify-content:space-between;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs);margin-bottom:4px;font-size:12px">
+          <span style="font-weight:500">${iv.admin_profiles?.name||'-'}</span>
+          <span style="color:${myAvail.length?'var(--accent)':'var(--text3)'}">${myAvail.length}개 입력${myAvail.length?'':' (미입력)'}</span>
+        </div>`;
+      }).join('')}
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;text-align:center">아직 겹치는 날짜 없음</div>
+    </div>`;
+  }
+
+  return `<div style="margin-bottom:16px">
+    <div style="font-size:12px;font-weight:700;color:#1a1a1a;margin-bottom:4px">👥 면접관 가능시간 현황</div>
+    ${allInterviewers.map(iv => {
+      const cnt = _schedAvailability.filter(a => a.admin_id === iv.admin_id).length;
+      return `<div style="display:flex;justify-content:space-between;padding:6px 8px;border:0.5px solid var(--border);border-radius:var(--rxs);margin-bottom:4px;font-size:12px">
+        <span style="font-weight:500">${iv.admin_profiles?.name||'-'}</span>
+        <span style="color:${cnt?'var(--accent)':'var(--text3)'}">${cnt}개 입력</span>
+      </div>`;
+    }).join('')}
+    <div style="font-size:12px;font-weight:700;color:#B25C00;margin:10px 0 6px">🔗 겹치는 날짜 (슬롯 추가 가능)</div>
+    ${overlapDates.map(([date, avails]) => {
+      const uniqueAdmins = [...new Set(avails.map(a => a.admin_id))];
+      const names = uniqueAdmins.map(aid => {
+        const iv = allInterviewers.find(i => i.admin_id === aid);
+        return iv?.admin_profiles?.name || '-';
+      });
+      // 시간 범위 표시
+      const timeRanges = avails.map(a => `${formatSlotTime(a.slot_time)}${a.slot_time_end?' ~ '+formatSlotTime(a.slot_time_end):''}`);
+      const alreadyAdded = _schedSlots.some(s => s.slot_date === date);
+      return `<div style="border:1.5px solid #F5CFA0;background:#FEF3E2;border-radius:var(--rsm);padding:10px;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:4px">${formatSlotDate(date)}</div>
+        <div style="font-size:11px;color:#7A3D00;margin-bottom:6px">${names.join(', ')} 가능</div>
+        <div style="font-size:11px;color:#444;margin-bottom:6px">${[...new Set(timeRanges)].join(' / ')}</div>
+        ${alreadyAdded
+          ? `<div style="font-size:11px;color:#3B6D11;font-weight:600">✓ 슬롯 추가됨</div>`
+          : `<button class="btn btn-sm" style="font-size:11px;width:100%" onclick="quickAddSlot('${date}')">이 날짜로 슬롯 추가</button>`}
+      </div>`;
+    }).join('')}
+  </div>`;
 }
 
 function renderMiniCalendar() {
@@ -2756,16 +3251,17 @@ function renderMiniCalendar() {
   const daysInMonth = new Date(year, month+1, 0).getDate();
   const today = new Date();
   const slotDates = new Set(_schedSlots.map(s => s.slot_date));
+  const availDates = new Set(_schedAvailability.map(a => a.slot_date));
   const days = ['일','월','화','수','목','금','토'];
   let cells = '';
   for (let i=0; i<firstDay; i++) cells += '<div class="cal-cell disabled"></div>';
   for (let d=1; d<=daysInMonth; d++) {
     const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const isToday = today.getFullYear()===year && today.getMonth()===month && today.getDate()===d;
-    const isSelected = _schedSelectedDate === dateStr;
-    const hasSlot = slotDates.has(dateStr);
+    const isSelected = _schedSelectedDates.has(dateStr);
+    const hasSlot = slotDates.has(dateStr) || availDates.has(dateStr);
     const isPast = new Date(dateStr) < new Date(today.toDateString());
-    cells += `<div class="cal-cell ${isToday?'today':''} ${isSelected?'selected':''} ${hasSlot?'has-slot':''} ${isPast?'disabled':''}" onclick="${isPast?'':'selectCalDate(\''+dateStr+'\')'}}">${d}</div>`;
+    cells += `<div class="cal-cell ${isToday?'today':''} ${isSelected?'selected':''} ${hasSlot&&!isSelected?'has-slot':''} ${isPast?'disabled':''}" ${isPast?'':'onclick="toggleCalDate(\'' + dateStr + '\')"'}>${d}</div>`;
   }
   return `<div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -2774,20 +3270,47 @@ function renderMiniCalendar() {
       <button class="btn btn-sm" onclick="changeCalMonth(1)">›</button>
     </div>
     <div class="cal-grid">${days.map(d=>`<div class="cal-day-header">${d}</div>`).join('')}${cells}</div>
+    ${_schedSelectedDates.size>0?`<button class="btn btn-sm btn-danger" style="width:100%;margin-top:4px;font-size:11px" onclick="clearCalDates()">선택 초기화</button>`:''}
   </div>`;
 }
 
-function selectCalDate(dateStr) { _schedSelectedDate = dateStr; loadSchedulePanel(); }
+function toggleCalDate(dateStr) {
+  if (_schedSelectedDates.has(dateStr)) _schedSelectedDates.delete(dateStr);
+  else _schedSelectedDates.add(dateStr);
+  loadSchedulePanel();
+}
+function clearCalDates() { _schedSelectedDates.clear(); loadSchedulePanel(); }
 function changeCalMonth(dir) { _schedCalMonth += dir; if (_schedCalMonth > 11) { _schedCalMonth=0; _schedCalYear++; } if (_schedCalMonth < 0) { _schedCalMonth=11; _schedCalYear--; } loadSchedulePanel(); }
 
-async function addSlot() {
-  const time = document.getElementById('slotTime')?.value;
+// 슬롯 일괄 추가 (다중 날짜)
+async function addSlots() {
+  const timeStart = document.getElementById('slotTimeStart')?.value;
+  const timeEnd = document.getElementById('slotTimeEnd')?.value;
   const location = document.getElementById('slotLocation')?.value || '';
-  if (!time || !_schedSelectedDate) return;
+  if (!timeStart || _schedSelectedDates.size === 0) { showToast('날짜와 시간을 선택하세요'); return; }
   const col = _schedIsDispatch ? 'dispatch_candidate_id' : 'application_id';
+  const rows = [..._schedSelectedDates].map(date => ({
+    [col]: _schedAppId, interview_round: _schedRound,
+    slot_date: date, slot_time: timeStart, slot_time_end: timeEnd||null,
+    slot_location: location, created_by: currentAdmin.id
+  }));
+  const { error } = await sb.from('interview_slots').insert(rows);
+  if (error) { showToast('오류: '+error.message); return; }
+  _schedSelectedDates.clear();
+  showToast(`✓ ${rows.length}개 슬롯 추가됨`);
+  await loadSchedulePanel();
+}
+
+// 겹치는 날짜 빠른 추가
+async function quickAddSlot(date) {
+  const col = _schedIsDispatch ? 'dispatch_candidate_id' : 'application_id';
+  // 해당 날짜 면접관 가능시간 중 가장 빠른 시작 시간 자동 적용
+  const dayAvails = _schedAvailability.filter(a => a.slot_date === date);
+  const timeStart = dayAvails.reduce((min, a) => a.slot_time < min ? a.slot_time : min, '23:59');
+  const timeEnd = dayAvails.reduce((max, a) => (a.slot_time_end||a.slot_time) > max ? (a.slot_time_end||a.slot_time) : max, '00:00');
   const { error } = await sb.from('interview_slots').insert({
     [col]: _schedAppId, interview_round: _schedRound,
-    slot_date: _schedSelectedDate, slot_time: time, slot_location: location,
+    slot_date: date, slot_time: timeStart, slot_time_end: timeEnd,
     created_by: currentAdmin.id
   });
   if (error) { showToast('오류: '+error.message); return; }
@@ -2807,16 +3330,21 @@ async function removeSlot(slotId) {
   await loadSchedulePanel();
 }
 
-async function addMyAvailability() {
-  const time = document.getElementById('availTime')?.value;
-  if (!time || !_schedSelectedDate) return;
+async function addMyAvailabilities() {
+  const timeStart = document.getElementById('availTimeStart')?.value;
+  const timeEnd = document.getElementById('availTimeEnd')?.value;
+  if (!timeStart || _schedSelectedDates.size === 0) { showToast('날짜와 시간을 선택하세요'); return; }
   const col = _schedIsDispatch ? 'dispatch_candidate_id' : 'application_id';
-  const { error } = await sb.from('interviewer_availability').insert({
+  const rows = [..._schedSelectedDates].map(date => ({
     [col]: _schedAppId, admin_id: currentAdmin.id,
-    slot_date: _schedSelectedDate, slot_time: time
-  }).select();
-  if (error && error.code !== '23505') { showToast('오류: '+error.message); return; }
-  showToast('✓ 가능시간 추가됨');
+    slot_date: date, slot_time: timeStart, slot_time_end: timeEnd||null
+  }));
+  // upsert (중복 무시)
+  for (const row of rows) {
+    await sb.from('interviewer_availability').upsert(row, { onConflict: `${col},admin_id,slot_date,slot_time` });
+  }
+  _schedSelectedDates.clear();
+  showToast(`✓ ${rows.length}개 가능시간 추가됨`);
   await loadSchedulePanel();
 }
 
@@ -2828,24 +3356,36 @@ async function removeMyAvailability(id) {
 async function sendScheduleEmail() {
   const confirmed = _schedSlots.filter(s => s.is_confirmed);
   if (!confirmed.length) { showToast('확정된 후보 시간이 없습니다'); return; }
-  // 토큰 생성
   const token = crypto.randomUUID();
   const col = _schedIsDispatch ? 'dispatch_candidate_id' : 'application_id';
-  await sb.from('interview_selections').upsert({ [col]: _schedAppId, token }, { onConflict: col });
-  // 이메일 발송 (Edge Function)
-  const app = allApps.find(a => a.id === _schedAppId);
-  const slots = confirmed.map(s => `${formatSlotDate(s.slot_date)} ${formatSlotTime(s.slot_time)}${s.slot_location?' ('+s.slot_location+')':''}`);
-  const selectionUrl = `${window.location.origin.replace('admin.html','')}schedule-select.html?token=${token}`;
-  try {
-    await fetch('https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/notify-interview-schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss' },
-      body: JSON.stringify({ applicantEmail: app?.email, applicantName: app?.name, slots, selectionUrl, round: _schedRound })
-    });
-    showToast('✅ 지원자에게 이메일 발송 완료');
-  } catch(e) {
-    showToast('이메일 발송 실패 - 수동으로 연락하세요');
+  const expiresAt = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // 2시간 후
+  // 기존 선택 레코드 있으면 업데이트, 없으면 삽입
+  const { data: existing } = await sb.from('interview_selections').select('id').eq(col, _schedAppId).maybeSingle();
+  if (existing) {
+    await sb.from('interview_selections').update({ token, slot_id: null, expires_at: expiresAt, selected_at: null }).eq('id', existing.id);
+  } else {
+    await sb.from('interview_selections').insert({ [col]: _schedAppId, token, expires_at: expiresAt });
   }
+  const app = _schedIsDispatch
+    ? (window._dispatchCands||[]).find(c => c.id === _schedAppId)
+    : allApps.find(a => a.id === _schedAppId);
+  const baseUrl = window.location.href.replace(/[^/]*$/, '');
+  const selectionUrl = `${baseUrl}schedule-select.html?token=${token}`;
+  const slots = confirmed.map(s => `${formatSlotDate(s.slot_date)} ${formatSlotTime(s.slot_time)}${s.slot_location?' ('+s.slot_location+')':''}`);
+  // 링크 클립보드 복사 (이메일 연동 전까지)
+  try { await navigator.clipboard.writeText(selectionUrl); } catch(e) {}
+  showConfirm('📧 지원자 발송 준비 완료', '', null);
+  document.getElementById('confirmSub').innerHTML = `
+    <div style="margin-top:10px">
+      <div style="font-size:13px;color:#1a1a1a;margin-bottom:10px">지원자에게 아래 링크를 전달해주세요. (2시간 유효)</div>
+      <div style="background:var(--surface2);border-radius:var(--rxs);padding:10px;font-size:11px;word-break:break-all;color:#534AB7;cursor:pointer" onclick="navigator.clipboard.writeText('${selectionUrl}');showToast('✓ 복사됨')">${selectionUrl}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">클릭하면 복사됩니다</div>
+      <div style="margin-top:10px;font-size:12px;font-weight:600">후보 시간:</div>
+      ${slots.map(s=>`<div style="font-size:12px;color:#444;padding:3px 0">• ${s}</div>`).join('')}
+    </div>`;
+  document.getElementById('confirmYes').style.display = 'none';
+  document.getElementById('confirmNo').textContent = '닫기';
+  document.getElementById('confirmNo').onclick = () => closeConfirmModal();
 }
 
 function formatSlotDate(d) {
