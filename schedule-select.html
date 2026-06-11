@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>면접 일정 선택 | 엘앤티렉서스(주)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Pretendard',-apple-system,sans-serif;background:#F5F4F0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:#fff;border-radius:16px;padding:40px;max-width:480px;width:100%;box-shadow:0 4px 24px rgba(0,0,0,.1)}
+  .logo{font-size:13px;font-weight:600;color:#534AB7;margin-bottom:24px}
+  h1{font-size:22px;font-weight:700;color:#1a1a1a;margin-bottom:8px}
+  .sub{font-size:14px;color:#666;margin-bottom:28px;line-height:1.6}
+  .slot{border:2px solid #E8E7E2;border-radius:12px;padding:16px 20px;margin-bottom:12px;cursor:pointer;transition:all .2s}
+  .slot:hover{border-color:#534AB7;background:#FAFAFE}
+  .slot.selected{border-color:#534AB7;background:#EEEDFE}
+  .slot-date{font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:4px}
+  .slot-time{font-size:15px;color:#534AB7;font-weight:600}
+  .slot-location{font-size:13px;color:#666;margin-top:4px}
+  .slot-check{display:none;color:#534AB7;font-size:18px;margin-left:auto}
+  .slot.selected .slot-check{display:block}
+  .slot-inner{display:flex;align-items:center;gap:12px}
+  .btn{width:100%;padding:16px;border-radius:10px;font-size:15px;font-weight:600;border:none;cursor:pointer;margin-top:8px;transition:all .2s}
+  .btn-primary{background:#534AB7;color:#fff}
+  .btn-primary:hover{background:#4239A3}
+  .btn-primary:disabled{background:#C4C2E0;cursor:not-allowed}
+  .msg{text-align:center;padding:40px 0;color:#666;font-size:14px;line-height:1.8}
+  .success{text-align:center;padding:20px 0}
+  .success-icon{font-size:48px;margin-bottom:16px}
+  .success-title{font-size:20px;font-weight:700;color:#1a1a1a;margin-bottom:8px}
+  .success-sub{font-size:14px;color:#666;line-height:1.6}
+  .divider{height:1px;background:#E8E7E2;margin:24px 0}
+</style>
+</head>
+<body>
+<div class="card" id="app">
+  <div class="loading" style="text-align:center;padding:60px 0;color:#666">
+    <div style="font-size:32px;margin-bottom:12px">📅</div>
+    <div>면접 일정을 불러오는 중...</div>
+  </div>
+</div>
+<script>
+const SUPABASE_URL = 'https://hslykriyfmnhbwzcocjs.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss';
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const token = new URLSearchParams(location.search).get('token');
+let selectedSlotId = null;
+let selectionId = null;
+
+const days = ['일','월','화','수','목','금','토'];
+function formatDate(d) {
+  const dt = new Date(d);
+  return `${dt.getFullYear()}년 ${dt.getMonth()+1}월 ${dt.getDate()}일 (${days[dt.getDay()]})`;
+}
+function formatTime(t) {
+  const [h,m] = t.split(':');
+  const hour = parseInt(h);
+  return `${hour < 12 ? '오전' : '오후'} ${hour <= 12 ? hour : hour-12}:${m}`;
+}
+
+async function init() {
+  if (!token) { showError('유효하지 않은 링크입니다'); return; }
+
+  // 토큰으로 선택 정보 조회
+  const { data: sel } = await sb.from('interview_selections')
+    .select('*, applications(name, email), dispatch_candidates(name)')
+    .eq('token', token).maybeSingle();
+
+  if (!sel) { showError('유효하지 않은 링크이거나 만료되었습니다'); return; }
+  selectionId = sel.id;
+
+  // 이미 선택했으면
+  if (sel.slot_id) {
+    const { data: slot } = await sb.from('interview_slots').select('*').eq('id', sel.slot_id).single();
+    showAlreadySelected(sel, slot);
+    return;
+  }
+
+  // 확정 슬롯 로드
+  const appId = sel.application_id || sel.dispatch_candidate_id;
+  const col = sel.application_id ? 'application_id' : 'dispatch_candidate_id';
+  const { data: slots } = await sb.from('interview_slots')
+    .select('*').eq(col, appId).eq('is_confirmed', true).order('slot_date').order('slot_time');
+
+  if (!slots?.length) { showError('아직 확정된 면접 일정이 없습니다.\n담당자에게 문의해주세요.'); return; }
+
+  const name = sel.applications?.name || sel.dispatch_candidates?.name || '지원자';
+  showSlots(name, slots);
+}
+
+function showSlots(name, slots) {
+  document.getElementById('app').innerHTML = `
+    <div class="logo">엘앤티렉서스(주) 채용</div>
+    <h1>면접 일정 선택</h1>
+    <div class="sub">${name}님, 아래 면접 후보 일정 중 참석 가능한 시간을 선택해 주세요.</div>
+    <div id="slotList">
+      ${slots.map(s => `
+        <div class="slot" id="slot-${s.id}" onclick="selectSlot('${s.id}')">
+          <div class="slot-inner">
+            <div style="flex:1">
+              <div class="slot-date">${formatDate(s.slot_date)}</div>
+              <div class="slot-time">${formatTime(s.slot_time)}</div>
+              ${s.slot_location ? `<div class="slot-location">📍 ${s.slot_location}</div>` : ''}
+            </div>
+            <span class="slot-check">✓</span>
+          </div>
+        </div>`).join('')}
+    </div>
+    <div class="divider"></div>
+    <button class="btn btn-primary" id="confirmBtn" onclick="confirmSelection()" disabled>선택 완료</button>
+    <div style="font-size:12px;color:#999;text-align:center;margin-top:12px">선택 후 변경이 어렵습니다. 신중하게 선택해 주세요.</div>
+  `;
+}
+
+function selectSlot(id) {
+  document.querySelectorAll('.slot').forEach(el => el.classList.remove('selected'));
+  document.getElementById('slot-'+id).classList.add('selected');
+  selectedSlotId = id;
+  document.getElementById('confirmBtn').disabled = false;
+}
+
+async function confirmSelection() {
+  if (!selectedSlotId) return;
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true; btn.textContent = '처리 중...';
+
+  const { error } = await sb.from('interview_selections')
+    .update({ slot_id: selectedSlotId, selected_at: new Date().toISOString() })
+    .eq('token', token);
+
+  if (error) { btn.disabled = false; btn.textContent = '선택 완료'; alert('오류가 발생했습니다. 다시 시도해주세요.'); return; }
+
+  const slot = document.querySelector('.slot.selected');
+  const dateText = slot.querySelector('.slot-date').textContent;
+  const timeText = slot.querySelector('.slot-time').textContent;
+  showSuccess(dateText, timeText);
+}
+
+function showSuccess(date, time) {
+  document.getElementById('app').innerHTML = `
+    <div class="logo">엘앤티렉서스(주) 채용</div>
+    <div class="success">
+      <div class="success-icon">🎉</div>
+      <div class="success-title">면접 일정이 확정되었습니다</div>
+      <div class="success-sub">
+        선택하신 일정으로 면접이 진행됩니다.<br>
+        <strong>${date}</strong><br>
+        <strong>${time}</strong><br><br>
+        추가 안내는 이메일로 발송드립니다.
+      </div>
+    </div>
+  `;
+}
+
+function showAlreadySelected(sel, slot) {
+  document.getElementById('app').innerHTML = `
+    <div class="logo">엘앤티렉서스(주) 채용</div>
+    <div class="success">
+      <div class="success-icon">✅</div>
+      <div class="success-title">이미 일정을 선택하셨습니다</div>
+      <div class="success-sub">
+        선택하신 면접 일정입니다.<br><br>
+        <strong>${slot ? formatDate(slot.slot_date) : '-'}</strong><br>
+        <strong>${slot ? formatTime(slot.slot_time) : '-'}</strong><br>
+        ${slot?.slot_location ? `📍 ${slot.slot_location}` : ''}
+      </div>
+    </div>
+  `;
+}
+
+function showError(msg) {
+  document.getElementById('app').innerHTML = `
+    <div class="logo">엘앤티렉서스(주) 채용</div>
+    <div class="msg">
+      <div style="font-size:32px;margin-bottom:12px">❌</div>
+      ${msg.replace(/\n/g,'<br>')}
+    </div>
+  `;
+}
+
+init();
+</script>
+</body>
+</html>
