@@ -1533,8 +1533,14 @@ async function openModal(id) {
   document.getElementById('mJobTitle').textContent = app.job_postings?.title||'-';
   document.getElementById('mEmail2').textContent = app.email||'';
   document.getElementById('mSubNum').textContent = app.submission_number||'-';
-  document.getElementById('mAvatar').textContent = (app.name||'?').slice(0,2);
-  document.getElementById('mAvatar').style.cssText = `background:${ac.bg};color:${ac.color};width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:500;flex-shrink:0`;
+  const avatarEl = document.getElementById('mAvatar');
+  if (app.photo_url) {
+    avatarEl.innerHTML = `<img src="${app.photo_url}" style="width:52px;height:52px;border-radius:50%;object-fit:cover">`;
+    avatarEl.style.cssText = 'flex-shrink:0';
+  } else {
+    avatarEl.textContent = (app.name||'?').slice(0,2);
+    avatarEl.style.cssText = `background:${ac.bg};color:${ac.color};width:52px;height:52px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:500;flex-shrink:0`;
+  }
   document.getElementById('mBadges').innerHTML = `<span class="stage-badge" style="background:${stageInfo.bg};color:${stageInfo.textColor}">${app.stage||'지원완료'}</span>${(app.apply_source||[]).map(s=>`<span class="stage-badge" style="background:var(--surface2);color:var(--text2)">${s}</span>`).join('')}`;
   document.getElementById('mCurrentStage').innerHTML = `<span class="stage-badge" style="background:${stageInfo.bg};color:${stageInfo.textColor}">${app.stage||'지원완료'}</span>`;
   document.getElementById('mBasicInfo').innerHTML=[['생년월일',app.birth_date||'-'],['성별',app.gender||'-'],['국적',app.nationality||'-'],['휴대폰',app.phone||'-'],['주소',app.address||'-',true]].map(([l,v,f])=>`<div class="info-item ${f?'full-width':''}"><div class="label">${l}</div><div class="val">${v}</div></div>`).join('');
@@ -2816,11 +2822,10 @@ async function renderInterviewSession(app) {
       .maybeSingle()
   ]);
 
-  // 합격/불합격 버튼 색상
+  // 합격/불합격 버튼
   const passBtn = `<button class="iv-pass-btn" style="background:#EAF3DE;color:#27500A" onclick="ivDecision('pass')">✅ 합격</button>`;
   const failBtn = `<button class="iv-pass-btn" style="background:#FCEBEB;color:#A32D2D" onclick="ivDecision('fail')">❌ 불합격</button>`;
 
-  // 평가 점수 렌더
   const renderStars = (field, val) => {
     return [1,2,3,4,5].map(n =>
       `<span class="eval-star" onclick="setEvalScore('${field}',${n})" id="star_${field}_${n}">${n <= (val||0) ? '⭐' : '☆'}</span>`
@@ -2829,6 +2834,25 @@ async function renderInterviewSession(app) {
 
   const ev = myEval || {};
 
+  // 총 경력 계산
+  const calcTotalCareerIv = (careers) => {
+    let totalMonths = 0;
+    (careers||[]).filter(c => !c.is_no_experience && c.start_month).forEach(c => {
+      const parseYM = s => { if (!s) return null; const [y,m] = s.split('-').map(Number); return y*12+(m||1); };
+      const start = parseYM(c.start_month);
+      const end = c.is_current ? (new Date().getFullYear()*12+new Date().getMonth()+1) : parseYM(c.end_month);
+      if (start && end && end > start) totalMonths += end - start;
+    });
+    if (!totalMonths) return '';
+    const y = Math.floor(totalMonths/12), m = totalMonths%12;
+    return y > 0 && m > 0 ? `${y}년 ${m}개월` : y > 0 ? `${y}년` : `${m}개월`;
+  };
+  const totalCareerIv = calcTotalCareerIv(careers);
+
+  const photoHtml = app.photo_url
+    ? `<img src="${app.photo_url}" style="width:80px;height:100px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0">`
+    : `<div style="width:80px;height:100px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--text3);flex-shrink:0">👤</div>`;
+
   c.innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:16px">
       ${passBtn}${failBtn}
@@ -2836,30 +2860,87 @@ async function renderInterviewSession(app) {
     <div class="iv-session-grid">
       <!-- 왼쪽: 이력서 -->
       <div class="iv-resume-panel">
-        <div style="font-size:18px;font-weight:700;margin-bottom:4px">${app.name}</div>
-        <div style="font-size:13px;color:#666;margin-bottom:16px">${app.email||''} ${app.phone?'· '+app.phone:''}</div>
+        <!-- 헤더: 사진 + 기본정보 -->
+        <div style="display:flex;gap:16px;margin-bottom:20px;padding:16px;background:var(--surface2);border-radius:var(--rsm)">
+          ${photoHtml}
+          <div style="flex:1">
+            <div style="font-size:20px;font-weight:700;margin-bottom:6px">${app.name}</div>
+            <div style="font-size:13px;color:#444;margin-bottom:3px">${app.email||''}</div>
+            <div style="font-size:13px;color:#444;margin-bottom:3px">${app.phone||''}</div>
+            <div style="font-size:12px;color:#666">${app.birth_date||''} ${app.gender?'· '+app.gender:''} ${app.nationality?'· '+app.nationality:''}</div>
+            ${app.address?`<div style="font-size:12px;color:#666;margin-top:2px">📍 ${app.address}</div>`:''}
+          </div>
+        </div>
 
+        <!-- 지원정보 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
+          ${[['희망연봉', app.desired_salary?app.desired_salary.toLocaleString()+'만원':'-'],
+             ['입사가능일', app.available_start_date||'-'],
+             ['근무형태', app.work_type||'-'],
+             ['지원경로', (app.apply_source||[]).join(', ')||'-']
+          ].map(([l,v])=>`<div style="background:var(--surface2);padding:8px 10px;border-radius:var(--rxs)">
+            <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:2px">${l}</div>
+            <div style="font-size:13px;color:#1a1a1a;font-weight:500">${v}</div>
+          </div>`).join('')}
+        </div>
+
+        <!-- 보유스킬 -->
+        ${(app.skills||[]).length ? `<div style="margin-bottom:14px">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#534AB7">보유 스킬</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${(app.skills||[]).map(s=>`<span style="background:#EEEDFE;color:#534AB7;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500">${s}</span>`).join('')}
+          </div>
+        </div>` : ''}
+
+        <!-- 학력 -->
         ${edus?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;color:#534AB7">학력</div>
         ${edus.map(e=>`<div class="exp-card">
           <div class="exp-title">${e.school}</div>
           <div class="exp-sub">${[e.major,e.degree].filter(Boolean).join(' · ')}</div>
-          <div class="exp-period">📅 ${e.start_month||''}~${e.end_month||''} ${e.status?'· '+e.status:''}</div>
+          <div class="exp-period">📅 ${e.start_month||''} ~ ${e.end_month||''}${e.status?' · '+e.status:''}</div>
+          ${e.gpa?`<div class="exp-salary">📊 학점 ${e.gpa}</div>`:''}
         </div>`).join('')}` : ''}
 
-        ${careers?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:12px;color:#534AB7">경력</div>
-        ${careers.map(c => c.is_no_experience ? '<div class="exp-card"><div class="exp-title">신입</div></div>'
+        <!-- 경력 -->
+        ${careers?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:14px;color:#534AB7">경력 ${totalCareerIv?`<span style="font-size:11px;font-weight:500;color:#534AB7;background:#EEEDFE;padding:2px 8px;border-radius:20px;margin-left:6px">총 ${totalCareerIv}</span>`:''}</div>
+        ${careers.map(c => c.is_no_experience ? '<div class="exp-card"><div class="exp-title">신입 / 경력 없음</div></div>'
           : `<div class="exp-card">
               <div class="exp-title">${c.company||'-'}</div>
               <div class="exp-sub">${[c.department,c.position,c.employment_type].filter(Boolean).join(' · ')}</div>
-              <div class="exp-period">📅 ${c.start_month||''}~${c.is_current?'현재':c.end_month||''}</div>
+              <div class="exp-period">📅 ${c.start_month||''} ~ ${c.is_current?'현재':c.end_month||''}</div>
               ${c.final_salary?`<div class="exp-salary">💰 최종연봉 ${c.final_salary.toLocaleString()}만원</div>`:''}
+              ${c.description?`<div class="exp-desc">${c.description}</div>`:''}
             </div>`).join('')}` : ''}
 
-        ${certs?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:12px;color:#534AB7">자격증</div>
-        ${certs.map(c=>`<div class="exp-card"><div class="exp-title">${c.name}</div><div class="exp-sub">${c.issuer||''} ${c.acquired_date?'· '+c.acquired_date:''}</div></div>`).join('')}` : ''}
+        <!-- 자격증 -->
+        ${certs?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:14px;color:#534AB7">자격증</div>
+        ${certs.map(c=>`<div class="exp-card">
+          <div class="exp-title">${c.name}</div>
+          <div class="exp-sub">${[c.issuer,c.acquired_date].filter(Boolean).join(' · ')}</div>
+        </div>`).join('')}` : ''}
 
-        ${langs?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:12px;color:#534AB7">어학</div>
-        ${langs.map(l=>`<div class="exp-card"><div class="exp-title">${l.language} ${l.test_name||''}</div><div class="exp-sub">${l.score||''} ${l.level?'· '+l.level:''}</div></div>`).join('')}` : ''}
+        <!-- 수상 -->
+        ${awards?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:14px;color:#534AB7">수상</div>
+        ${awards.map(a=>`<div class="exp-card">
+          <div class="exp-title">${a.title||a.name||'-'}</div>
+          <div class="exp-sub">${[a.organization,a.awarded_date].filter(Boolean).join(' · ')}</div>
+        </div>`).join('')}` : ''}
+
+        <!-- 어학 -->
+        ${langs?.length ? `<div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:14px;color:#534AB7">어학</div>
+        ${langs.map(l=>`<div class="exp-card">
+          <div class="exp-title">${l.language} ${l.test_name||''}</div>
+          <div class="exp-sub">${[l.score,l.level].filter(Boolean).join(' · ')}</div>
+        </div>`).join('')}` : ''}
+
+        <!-- 자기소개서 -->
+        ${app.essay_motivation||app.essay_experience||app.essay_strength||app.essay_goal ? `
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:14px;color:#534AB7">자기소개서</div>
+        ${[['성장과정',app.essay_experience],['성격의 장단점',app.essay_strength],['지원동기',app.essay_motivation],['입사 후 목표',app.essay_goal]].filter(([,v])=>v).map(([q,a])=>`
+          <div class="exp-card" style="margin-bottom:10px">
+            <div style="font-size:12px;font-weight:600;color:#534AB7;margin-bottom:6px">${q}</div>
+            <div style="font-size:13px;color:#333;line-height:1.7;white-space:pre-wrap">${a}</div>
+          </div>`).join('')}` : ''}
       </div>
 
       <!-- 오른쪽: 평가표 -->
