@@ -804,7 +804,18 @@ let confirmCallback = null;
 // ── 초기화 ───────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', async () => {
   const { data:{ session } } = await sb.auth.getSession();
-  if (session) { currentAdmin = session.user; await loadAdminProfile(); showApp(); }
+  if (session) {
+    currentAdmin = session.user;
+    await loadAdminProfile();
+    // admin_profiles에 없으면 지원자 계정 → 강제 로그아웃
+    if (!adminProfile) {
+      await sb.auth.signOut();
+      document.getElementById('loginErr').textContent = '관리자 계정이 아닙니다';
+      document.getElementById('loginErr').classList.remove('hidden');
+      return;
+    }
+    showApp();
+  }
 });
 
 async function loadAdminProfile() {
@@ -823,6 +834,12 @@ async function doLogin() {
   if (error) { showErr(err, '이메일 또는 비밀번호가 올바르지 않습니다'); return; }
   currentAdmin = data.user;
   await loadAdminProfile();
+  // admin_profiles에 없으면 지원자 계정
+  if (!adminProfile) {
+    await sb.auth.signOut();
+    showErr(err, '관리자 계정이 아닙니다. 지원자 페이지를 이용해주세요.');
+    return;
+  }
   showApp();
 }
 
