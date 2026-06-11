@@ -455,6 +455,12 @@ async function doSignup() {
   fd.basic.email = email;
   // applicant_profiles 생성
   await sb.from('applicant_profiles').upsert({ id: currentUser.id, email, name });
+  // 이메일 인증 없이 바로 로그인 처리
+  if (!currentUser || !currentUser.email_confirmed_at) {
+    // 바로 로그인 시도
+    const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({ email, password: pw });
+    if (!loginErr && loginData.user) currentUser = loginData.user;
+  }
   showForm();
 }
 
