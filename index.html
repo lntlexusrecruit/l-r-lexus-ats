@@ -504,9 +504,24 @@ async function showForm() {
       gender:app.gender, nation:app.nationality, email:app.email||currentUser.email,
       phone:app.phone, addr:app.address,
       salary:app.desired_salary, startDate:app.available_start_date,
-      workType:app.work_type, source:app.apply_source||[], skills:app.skills||[]
+      workType:app.work_type, source:app.apply_source||[], skills:app.skills||[],
+      photoUrl:app.photo_url||null,
+      veterans:app.veterans_status||'비해당', veteransNum:app.veterans_number||'',
+      disability:app.disability_status||'비해당', disabilityType:app.disability_type||'',
+      disabilityGrade:app.disability_grade||'', disabilityNum:app.disability_number||'',
+      military:app.military_status||null, militaryBranch:app.military_branch||'',
+      militaryRank:app.military_rank||'', militaryPeriod:app.military_period||'',
+      militaryExemption:app.military_exemption||'',
+      hobby:app.hobby||'', specialty:app.specialty||''
     };
     skills = [...(app.skills||[])];
+    // 기존 증명사진 미리보기 복원
+    if (app.photo_url) {
+      setTimeout(() => {
+        const p = document.getElementById('photoPreview');
+        if (p) p.innerHTML = `<img src="${app.photo_url}" alt="증명사진" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+      }, 100);
+    }
     fd.essay = {
       q1:app.essay_motivation, q2:app.essay_experience,
       q3:app.essay_strength, q4:app.essay_goal
@@ -617,11 +632,29 @@ function buildPayload(isDraft) {
     link_linkedin: fd.extra?.linkedin||null,
     link_blog: fd.extra?.blog||null,
     link_portfolio: fd.extra?.portfolio||null,
+    photo_url: fd.basic.photoUrl||null,
+    veterans_status: fd.basic.veterans||'비해당',
+    veterans_number: fd.basic.veteransNum||null,
+    disability_status: fd.basic.disability||'비해당',
+    disability_type: fd.basic.disabilityType||null,
+    disability_grade: fd.basic.disabilityGrade||null,
+    disability_number: fd.basic.disabilityNum||null,
+    military_status: fd.basic.military||null,
+    military_branch: fd.basic.militaryBranch||null,
+    military_rank: fd.basic.militaryRank||null,
+    military_period: fd.basic.militaryPeriod||null,
+    military_exemption: fd.basic.militaryExemption||null,
+    hobby: fd.basic.hobby||null,
+    specialty: fd.basic.specialty||null,
   };
 }
 
 async function saveSubtables() {
   if(!applicationId) return;
+  // 증명사진 URL 저장 (이미 previewPhoto에서 업로드 완료됨)
+  if (fd.basic.photoUrl) {
+    await sb.from('applications').update({ photo_url: fd.basic.photoUrl }).eq('id', applicationId);
+  }
   // 학력
   await sb.from('education').delete().eq('application_id', applicationId);
   const edus = fd.education.filter(e=>e.school).map((e,i)=>({application_id:applicationId,sort_order:i,school:e.school,major:e.major||null,degree:e.degree||'학사',status:e.status||'졸업',start_month:e.startMonth||null,end_month:e.endMonth||null,gpa:e.gpa||null}));
@@ -712,7 +745,7 @@ function buildBasic(){
       <div class="field"><label class="field-label">영문 이름</label><input type="text" id="f_nameEn" value="${d.nameEn||''}" placeholder="Hong Gildong"></div>
     </div>
     <div class="field-row three">
-      <div class="field"><label class="field-label">생년월일 <span class="required">*</span></label><input type="date" id="f_birth" value="${d.birth||''}"></div>
+      <div class="field"><label class="field-label">생년월일 <span class="required">*</span></label><input type="date" id="f_birth" value="${d.birth||''}" oninput="calcAge(this.value)"><div id="ageDisplay" style="font-size:12px;color:var(--accent);margin-top:4px;font-weight:500">${d.birth?'만 '+calcAgeVal(d.birth)+'세':''}</div></div>
       <div class="field"><label class="field-label">성별 <span class="required">*</span></label><select id="f_gender"><option value="">선택</option>${['남성','여성','기타'].map(v=>`<option value="${v}" ${d.gender===v?'selected':''}>${v}</option>`).join('')}</select></div>
       <div class="field"><label class="field-label">국적</label><select id="f_nation"><option value="대한민국" ${!d.nation||d.nation==='대한민국'?'selected':''}>대한민국</option><option value="기타" ${d.nation==='기타'?'selected':''}>기타</option></select></div>
     </div>
@@ -743,6 +776,51 @@ function buildBasic(){
         <input class="tag-input-field" id="skillInput" placeholder="스킬 입력 후 Enter" onkeydown="addSkill(event)">
       </div>
       <div class="field-hint">예: React, TypeScript, Node.js …</div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label class="field-label">특기</label><input type="text" id="f_specialty" value="${d.specialty||''}" placeholder="예: 영상편집, 악기연주"></div>
+      <div class="field"><label class="field-label">취미</label><input type="text" id="f_hobby" value="${d.hobby||''}" placeholder="예: 독서, 등산"></div>
+    </div>
+  </div>
+  <div class="form-card">
+    <div class="card-title"><span class="card-title-icon">🎖️</span>보훈 · 장애 · 병역</div>
+    <div class="field">
+      <label class="field-label">보훈 여부</label>
+      <div class="radio-group" id="veteransGroup">
+        ${['비해당','해당'].map(v=>`<label class="radio-item ${(d.veterans||'비해당')===v?'selected':''}"><input type="radio" name="veterans" value="${v}" ${(d.veterans||'비해당')===v?'checked':''} onchange="selRadio(this,'veteransGroup');toggleSubField('veteransDetail',this.value==='해당')">${v}</label>`).join('')}
+      </div>
+      <div id="veteransDetail" style="display:${d.veterans==='해당'?'block':'none'};margin-top:8px">
+        <input type="text" id="f_veteransNum" value="${d.veteransNum||''}" placeholder="보훈번호" style="width:100%;padding:10px 12px;border:0.5px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;font-family:'Pretendard',sans-serif">
+      </div>
+    </div>
+    <div class="field" style="margin-top:14px">
+      <label class="field-label">장애 여부</label>
+      <div class="radio-group" id="disabilityGroup">
+        ${['비해당','해당'].map(v=>`<label class="radio-item ${(d.disability||'비해당')===v?'selected':''}"><input type="radio" name="disability" value="${v}" ${(d.disability||'비해당')===v?'checked':''} onchange="selRadio(this,'disabilityGroup');toggleSubField('disabilityDetail',this.value==='해당')">${v}</label>`).join('')}
+      </div>
+      <div id="disabilityDetail" style="display:${d.disability==='해당'?'block':'none'};margin-top:8px">
+        <div class="field-row">
+          <div class="field"><label class="field-label">장애종별</label><input type="text" id="f_disabilityType" value="${d.disabilityType||''}" placeholder="예: 지체장애"></div>
+          <div class="field"><label class="field-label">장애정도</label><input type="text" id="f_disabilityGrade" value="${d.disabilityGrade||''}" placeholder="예: 중증"></div>
+        </div>
+        <input type="text" id="f_disabilityNum" value="${d.disabilityNum||''}" placeholder="장애인등록번호" style="width:100%;padding:10px 12px;border:0.5px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;font-family:'Pretendard',sans-serif;margin-top:8px">
+      </div>
+    </div>
+    <div class="field" style="margin-top:14px">
+      <label class="field-label">군필 여부</label>
+      <div class="radio-group" id="militaryGroup">
+        ${['필','미필(여성포함)','면제'].map(v=>`<label class="radio-item ${d.military===v?'selected':''}"><input type="radio" name="military" value="${v}" ${d.military===v?'checked':''} onchange="selRadio(this,'militaryGroup');onMilitaryChange(this.value)">${v}</label>`).join('')}
+      </div>
+      <div id="militaryDetail_필" style="display:${d.military==='필'?'block':'none'};margin-top:8px">
+        <div class="field-row">
+          <div class="field"><label class="field-label">군별</label><input type="text" id="f_militaryBranch" value="${d.militaryBranch||''}" placeholder="예: 육군"></div>
+          <div class="field"><label class="field-label">계급</label><input type="text" id="f_militaryRank" value="${d.militaryRank||''}" placeholder="예: 병장"></div>
+        </div>
+        <input type="text" id="f_militaryPeriod" value="${d.militaryPeriod||''}" placeholder="복무기간 (예: 2018-01 ~ 2019-10)" style="width:100%;padding:10px 12px;border:0.5px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;font-family:'Pretendard',sans-serif;margin-top:8px">
+      </div>
+      <div id="militaryDetail_면제" style="display:${d.military==='면제'?'block':'none'};margin-top:8px">
+        <input type="text" id="f_militaryExemption" value="${d.militaryExemption||''}" placeholder="면제사유" style="width:100%;padding:10px 12px;border:0.5px solid var(--border2);border-radius:var(--radius-xs);font-size:13px;font-family:'Pretendard',sans-serif">
+      </div>
     </div>
   </div>`;
   return w;
@@ -911,6 +989,20 @@ function collectStep(){
     const wt=document.querySelector('input[name="wt"]:checked');if(wt)fd.basic.workType=wt.value;
     fd.basic.source=Array.from(document.querySelectorAll('.check-group input:checked')).map(c=>c.value);
     fd.basic.skills=[...skills];
+    // 새 필드
+    fd.basic.veterans = document.querySelector('input[name="veterans"]:checked')?.value||'비해당';
+    fd.basic.veteransNum = g('f_veteransNum');
+    fd.basic.disability = document.querySelector('input[name="disability"]:checked')?.value||'비해당';
+    fd.basic.disabilityType = g('f_disabilityType');
+    fd.basic.disabilityGrade = g('f_disabilityGrade');
+    fd.basic.disabilityNum = g('f_disabilityNum');
+    fd.basic.military = document.querySelector('input[name="military"]:checked')?.value||null;
+    fd.basic.militaryBranch = g('f_militaryBranch');
+    fd.basic.militaryRank = g('f_militaryRank');
+    fd.basic.militaryPeriod = g('f_militaryPeriod');
+    fd.basic.militaryExemption = g('f_militaryExemption');
+    fd.basic.hobby = g('f_hobby');
+    fd.basic.specialty = g('f_specialty');
   }
   if(currentStep===1){
     document.querySelectorAll('[data-ei]').forEach(el=>{const i=el.dataset.ei,k=el.dataset.k;if(!fd.education[i])fd.education[i]={};fd.education[i][k]=el.value;});
@@ -937,9 +1029,50 @@ function g(id){const el=document.getElementById(id);return el?el.value:'';}
 function rmEntry(arr,idx,elId){const p=arr.split('.');if(p.length===1)fd[arr].splice(idx,1);else fd[p[0]][p[1]].splice(idx,1);document.getElementById(elId)?.remove();}
 function selRadio(input,groupId){document.querySelectorAll('#'+groupId+' .radio-item').forEach(l=>l.classList.remove('selected'));input.closest('.radio-item').classList.add('selected');}
 function selCheck(input){input.closest('.check-item').classList.toggle('selected',input.checked);}
+function calcAgeVal(birth) {
+  if (!birth) return '';
+  const b = new Date(birth), today = new Date();
+  let age = today.getFullYear() - b.getFullYear();
+  const m = today.getMonth() - b.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+  return age;
+}
+function calcAge(birth) {
+  const el = document.getElementById('ageDisplay');
+  if (!el) return;
+  const age = calcAgeVal(birth);
+  el.textContent = age ? '만 ' + age + '세' : '';
+}
+function toggleSubField(id, show) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = show ? 'block' : 'none';
+}
+function onMilitaryChange(val) {
+  ['필','면제'].forEach(v => {
+    const el = document.getElementById('militaryDetail_' + v);
+    if (el) el.style.display = val === v ? 'block' : 'none';
+  });
+}
 function addSkill(e){if(e.key!=='Enter')return;const input=document.getElementById('skillInput');const v=input.value.trim();if(!v||skills.includes(v))return;skills.push(v);const chip=document.createElement('span');chip.className='skill-chip';chip.dataset.s=v;chip.innerHTML=`${v}<span class="skill-chip-remove" onclick="rmSkill('${v}')">×</span>`;document.getElementById('skillWrap').insertBefore(chip,input);input.value='';e.preventDefault();}
 function rmSkill(v){skills=skills.filter(s=>s!==v);document.querySelectorAll(`.skill-chip[data-s="${v}"]`).forEach(c=>c.remove());}
-function previewPhoto(input){if(!input.files[0])return;const r=new FileReader();r.onload=e=>{const p=document.getElementById('photoPreview');p.innerHTML=`<img src="${e.target.result}" alt="증명사진">`;};r.readAsDataURL(input.files[0]);}
+async function previewPhoto(input){
+  if(!input.files[0])return;
+  const file=input.files[0];
+  // 미리보기
+  const r=new FileReader();
+  r.onload=e=>{const p=document.getElementById('photoPreview');p.innerHTML=`<img src="${e.target.result}" alt="증명사진" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;};
+  r.readAsDataURL(file);
+  // Storage 업로드
+  try {
+    const ext = file.name.split('.').pop();
+    const path = `photos/${currentUser.id}_${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from('applicant-files').upload(path, file, { upsert: true });
+    if (!error) {
+      const { data } = sb.storage.from('applicant-files').getPublicUrl(path);
+      fd.basic.photoUrl = data.publicUrl;
+    }
+  } catch(e) { console.log('사진 업로드 실패', e); }
+}
 function showLoading(txt){document.getElementById('loadingText').textContent=txt||'처리 중...';document.getElementById('loadingOverlay').classList.remove('hidden');}
 function hideLoading(){document.getElementById('loadingOverlay').classList.add('hidden');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}

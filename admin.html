@@ -1543,7 +1543,24 @@ async function openModal(id) {
   }
   document.getElementById('mBadges').innerHTML = `<span class="stage-badge" style="background:${stageInfo.bg};color:${stageInfo.textColor}">${app.stage||'지원완료'}</span>${(app.apply_source||[]).map(s=>`<span class="stage-badge" style="background:var(--surface2);color:var(--text2)">${s}</span>`).join('')}`;
   document.getElementById('mCurrentStage').innerHTML = `<span class="stage-badge" style="background:${stageInfo.bg};color:${stageInfo.textColor}">${app.stage||'지원완료'}</span>`;
-  document.getElementById('mBasicInfo').innerHTML=[['생년월일',app.birth_date||'-'],['성별',app.gender||'-'],['국적',app.nationality||'-'],['휴대폰',app.phone||'-'],['주소',app.address||'-',true]].map(([l,v,f])=>`<div class="info-item ${f?'full-width':''}"><div class="label">${l}</div><div class="val">${v}</div></div>`).join('');
+  // 만나이 계산
+  const calcAge = (birth) => {
+    if (!birth) return '';
+    const b = new Date(birth), today = new Date();
+    let age = today.getFullYear() - b.getFullYear();
+    const m = today.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+    return `만 ${age}세`;
+  };
+  document.getElementById('mBasicInfo').innerHTML=[
+    ['생년월일', (app.birth_date||'-') + (app.birth_date ? ' ('+calcAge(app.birth_date)+')' : '')],
+    ['성별',app.gender||'-'],['국적',app.nationality||'-'],
+    ['휴대폰',app.phone||'-'],['주소',app.address||'-',true],
+    ['특기',app.specialty||'-'],['취미',app.hobby||'-'],
+    ['보훈여부',(app.veterans_status||'비해당') + (app.veterans_status==='해당'&&app.veterans_number?' ('+app.veterans_number+')':'')],
+    ['장애여부',(app.disability_status||'비해당') + (app.disability_status==='해당'? ` (${app.disability_type||''} ${app.disability_grade||''})`.trim() : '')],
+    ['군필여부', app.military_status||(app.gender==='여성'?'미필(여성포함)':'-') + (app.military_status==='필'&&app.military_branch?' '+app.military_branch+' '+app.military_rank:'') + (app.military_status==='면제'&&app.military_exemption?' ('+app.military_exemption+')':'')||'-']
+  ].map(([l,v,f])=>`<div class="info-item ${f?'full-width':''}"><div class="label">${l}</div><div class="val">${v}</div></div>`).join('');
   document.getElementById('mApplyInfo').innerHTML=[['희망연봉',app.desired_salary?app.desired_salary.toLocaleString()+'만원':'-'],['입사가능일',app.available_start_date||'-'],['근무형태',app.work_type||'-'],['지원경로',(app.apply_source||[]).join(', ')||'-'],['지원일',app.submitted_at?new Date(app.submitted_at).toLocaleDateString('ko-KR'):'-'],['접수번호',app.submission_number||'-']].map(([l,v])=>`<div class="info-item"><div class="label">${l}</div><div class="val">${v}</div></div>`).join('');
   document.getElementById('mSkills').innerHTML=(app.skills||[]).map(s=>`<span class="skill-tag">${s}</span>`).join('')||'<span style="font-size:13px;color:var(--text3)">없음</span>';
   const links=[['GitHub',app.link_github],['LinkedIn',app.link_linkedin],['블로그',app.link_blog],['포트폴리오',app.link_portfolio]].filter(([,v])=>v);
@@ -2835,6 +2852,14 @@ async function renderInterviewSession(app) {
   const ev = myEval || {};
 
   // 총 경력 계산
+  const calcAgeVal2 = (birth) => {
+    if (!birth) return '';
+    const b = new Date(birth), today = new Date();
+    let age = today.getFullYear() - b.getFullYear();
+    const m = today.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < b.getDate())) age--;
+    return age;
+  };
   const calcTotalCareerIv = (careers) => {
     let totalMonths = 0;
     (careers||[]).filter(c => !c.is_no_experience && c.start_month).forEach(c => {
@@ -2872,15 +2897,21 @@ async function renderInterviewSession(app) {
           </div>
         </div>
 
-        <!-- 지원정보 -->
+        <!-- 지원정보 + 개인정보 -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px">
-          ${[['희망연봉', app.desired_salary?app.desired_salary.toLocaleString()+'만원':'-'],
+          ${[['생년월일', app.birth_date ? app.birth_date + ' (만 ' + calcAgeVal2(app.birth_date) + '세)' : '-'],
+             ['성별/국적', [app.gender, app.nationality].filter(Boolean).join(' / ')||'-'],
+             ['희망연봉', app.desired_salary?app.desired_salary.toLocaleString()+'만원':'-'],
              ['입사가능일', app.available_start_date||'-'],
              ['근무형태', app.work_type||'-'],
-             ['지원경로', (app.apply_source||[]).join(', ')||'-']
+             ['지원경로', (app.apply_source||[]).join(', ')||'-'],
+             ['보훈', (app.veterans_status||'비해당') + (app.veterans_status==='해당'&&app.veterans_number?' ('+app.veterans_number+')':'')],
+             ['장애', (app.disability_status||'비해당') + (app.disability_status==='해당'&&app.disability_type?' ('+app.disability_type+')':'')],
+             ['군필', app.military_status||(app.gender==='여성'?'미필(여성포함)':'-')],
+             ['특기/취미', [app.specialty, app.hobby].filter(Boolean).join(' / ')||'-']
           ].map(([l,v])=>`<div style="background:var(--surface2);padding:8px 10px;border-radius:var(--rxs)">
             <div style="font-size:10px;color:var(--text3);font-weight:600;margin-bottom:2px">${l}</div>
-            <div style="font-size:13px;color:#1a1a1a;font-weight:500">${v}</div>
+            <div style="font-size:12px;color:#1a1a1a;font-weight:500">${v}</div>
           </div>`).join('')}
         </div>
 
