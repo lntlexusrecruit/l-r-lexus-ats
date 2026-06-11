@@ -3171,18 +3171,19 @@ async function loadSchedulePanel() {
       <div style="font-size:11px;color:var(--text3);margin-bottom:8px">날짜 여러 개 선택 후 한번에 추가 가능</div>
       ${renderMiniCalendar()}
       ${_schedSelectedDates.size > 0 ? `
-        <div style="margin-top:10px;padding:12px;background:var(--surface2);border-radius:var(--rxs)">
-          <div style="font-size:12px;font-weight:600;margin-bottom:8px">선택된 날짜 (${_schedSelectedDates.size}개)</div>
-          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
-            ${[..._schedSelectedDates].sort().map(d=>`<span style="font-size:11px;background:#EEEDFE;color:#534AB7;padding:2px 8px;border-radius:20px">${formatSlotDate(d)}</span>`).join('')}
-          </div>
-          <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center">
-            <span style="font-size:12px;font-weight:500;white-space:nowrap">가능시간</span>
-            <input type="time" id="availTimeStart" value="09:00" style="flex:1;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px">
-            <span style="font-size:12px;white-space:nowrap">~</span>
-            <input type="time" id="availTimeEnd" value="18:00" style="flex:1;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px">
-          </div>
-          <button class="btn btn-primary btn-sm" style="width:100%" onclick="addMyAvailabilities()">가능시간 추가</button>
+        <div style="margin-top:10px">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px">날짜별 가능시간 설정</div>
+          ${[..._schedSelectedDates].sort().map((d,i) => `
+            <div style="padding:10px;background:var(--surface2);border-radius:var(--rxs);margin-bottom:8px">
+              <div style="font-size:12px;font-weight:600;color:#534AB7;margin-bottom:8px">${formatSlotDate(d)}</div>
+              <div style="display:flex;gap:6px;align-items:center">
+                <span style="font-size:11px;font-weight:500;white-space:nowrap;color:#333">가능시간</span>
+                <input type="time" id="availStart_${i}" value="09:00" style="flex:1;padding:6px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:12px">
+                <span style="font-size:11px;white-space:nowrap;color:#333">~</span>
+                <input type="time" id="availEnd_${i}" value="18:00" style="flex:1;padding:6px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:12px">
+              </div>
+            </div>`).join('')}
+          <button class="btn btn-primary btn-sm" style="width:100%;margin-top:4px" onclick="addMyAvailabilities()">가능시간 추가</button>
         </div>` : `<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">날짜를 클릭하세요 (여러 개 선택 가능)</div>`}
       <div style="margin-top:8px">
         ${_schedAvailability.filter(a=>a.admin_id===myId).map(a=>`
@@ -3353,15 +3354,17 @@ async function removeSlot(slotId) {
 }
 
 async function addMyAvailabilities() {
-  const timeStart = document.getElementById('availTimeStart')?.value;
-  const timeEnd = document.getElementById('availTimeEnd')?.value;
-  if (!timeStart || _schedSelectedDates.size === 0) { showToast('날짜와 시간을 선택하세요'); return; }
+  if (_schedSelectedDates.size === 0) { showToast('날짜를 선택하세요'); return; }
   const col = _schedIsDispatch ? 'dispatch_candidate_id' : 'application_id';
-  const rows = [..._schedSelectedDates].map(date => ({
-    [col]: _schedAppId, admin_id: currentAdmin.id,
-    slot_date: date, slot_time: timeStart, slot_time_end: timeEnd||null
-  }));
-  // upsert (중복 무시)
+  const dates = [..._schedSelectedDates].sort();
+  const rows = dates.map((date, i) => {
+    const start = document.getElementById(`availStart_${i}`)?.value || '09:00';
+    const end = document.getElementById(`availEnd_${i}`)?.value || null;
+    return {
+      [col]: _schedAppId, admin_id: currentAdmin.id,
+      slot_date: date, slot_time: start, slot_time_end: end||null
+    };
+  });
   for (const row of rows) {
     await sb.from('interviewer_availability').upsert(row, { onConflict: `${col},admin_id,slot_date,slot_time` });
   }
