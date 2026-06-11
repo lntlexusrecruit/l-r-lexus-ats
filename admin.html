@@ -1062,7 +1062,14 @@ async function deleteJob(id, title) {
 
 // ── 지원자 목록 ──────────────────────────────────────────
 async function loadApplications() {
-  let query = sb.from('applications').select('*, job_postings(title, department)').eq('is_draft', false).order('submitted_at', { ascending: false });
+  let query = sb.from('applications').select(`
+    *, job_postings(title, department),
+    photo_url, skills, link_portfolio, portfolio_file_url, resume_file_url,
+    veterans_status, veterans_number,
+    disability_status, disability_type, disability_grade, disability_number,
+    military_status, military_branch, military_rank, military_period, military_exemption,
+    hobby, specialty
+  `).eq('is_draft', false).order('submitted_at', { ascending: false });
   if (adminProfile?.role !== 'superadmin') {
     if (!allJobs.length) { allApps = []; renderPipeline(); updateStats(); return; }
     query = query.in('job_posting_id', allJobs.map(j => j.id));
@@ -1557,14 +1564,23 @@ async function openModal(id) {
     ['성별',app.gender||'-'],['국적',app.nationality||'-'],
     ['휴대폰',app.phone||'-'],['주소',app.address||'-',true],
     ['특기',app.specialty||'-'],['취미',app.hobby||'-'],
-    ['보훈여부',(app.veterans_status||'비해당') + (app.veterans_status==='해당'&&app.veterans_number?' ('+app.veterans_number+')':'')],
-    ['장애여부',(app.disability_status||'비해당') + (app.disability_status==='해당'? ` (${app.disability_type||''} ${app.disability_grade||''})`.trim() : '')],
-    ['군필여부', app.military_status||(app.gender==='여성'?'미필(여성포함)':'-') + (app.military_status==='필'&&app.military_branch?' '+app.military_branch+' '+app.military_rank:'') + (app.military_status==='면제'&&app.military_exemption?' ('+app.military_exemption+')':'')||'-']
+    ['보훈여부', app.veterans_status==='해당' ? `해당 (${app.veterans_number||'번호없음'})` : '비해당'],
+    ['장애여부', app.disability_status==='해당' ? `해당 · ${app.disability_type||'-'} · ${app.disability_grade||'-'} (${app.disability_number||'번호없음'})` : '비해당'],
+    ['군필여부', (() => {
+      if (!app.military_status) return '-';
+      if (app.military_status==='필') return `필 · ${app.military_branch||'-'} · ${app.military_rank||'-'} (${app.military_period||'-'})`;
+      if (app.military_status==='면제') return `면제 (${app.military_exemption||'-'})`;
+      return app.military_status;
+    })()]
   ].map(([l,v,f])=>`<div class="info-item ${f?'full-width':''}"><div class="label">${l}</div><div class="val">${v}</div></div>`).join('');
   document.getElementById('mApplyInfo').innerHTML=[['희망연봉',app.desired_salary?app.desired_salary.toLocaleString()+'만원':'-'],['입사가능일',app.available_start_date||'-'],['근무형태',app.work_type||'-'],['지원경로',(app.apply_source||[]).join(', ')||'-'],['지원일',app.submitted_at?new Date(app.submitted_at).toLocaleDateString('ko-KR'):'-'],['접수번호',app.submission_number||'-']].map(([l,v])=>`<div class="info-item"><div class="label">${l}</div><div class="val">${v}</div></div>`).join('');
   document.getElementById('mSkills').innerHTML=(app.skills||[]).map(s=>`<span class="skill-tag">${s}</span>`).join('')||'<span style="font-size:13px;color:var(--text3)">없음</span>';
-  const links=[['GitHub',app.link_github],['LinkedIn',app.link_linkedin],['블로그',app.link_blog],['포트폴리오',app.link_portfolio]].filter(([,v])=>v);
-  document.getElementById('mLinks').innerHTML=links.map(([l,v])=>`<div class="info-item"><div class="label">${l}</div><div class="val"><a href="${v}" target="_blank" style="color:var(--b600)">${v}</a></div></div>`).join('')||'<div style="font-size:13px;color:var(--text3)">없음</div>';
+  const links=[['GitHub',app.link_github],['LinkedIn',app.link_linkedin],['블로그',app.link_blog],['포트폴리오 URL',app.link_portfolio]].filter(([,v])=>v);
+  const fileLinks = [];
+  if (app.portfolio_file_url) fileLinks.push(['포트폴리오 파일', app.portfolio_file_url]);
+  if (app.resume_file_url) fileLinks.push(['이력서 파일', app.resume_file_url]);
+  const allLinks = [...links, ...fileLinks];
+  document.getElementById('mLinks').innerHTML=allLinks.map(([l,v])=>`<div class="info-item"><div class="label">${l}</div><div class="val"><a href="${v}" target="_blank" style="color:var(--b600)">🔗 보기</a></div></div>`).join('')||'<div style="font-size:13px;color:var(--text3)">없음</div>';
   const [{data:edus},{data:careers}]=await Promise.all([sb.from('education').select('*').eq('application_id',id).order('sort_order'),sb.from('work_experience').select('*').eq('application_id',id).order('sort_order')]);
   document.getElementById('mEdu').innerHTML=(edus||[]).length?(edus||[]).map(e=>`
     <div class="exp-card">

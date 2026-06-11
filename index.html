@@ -638,6 +638,7 @@ function buildPayload(isDraft) {
     link_linkedin: fd.extra?.linkedin||null,
     link_blog: fd.extra?.blog||null,
     link_portfolio: fd.extra?.portfolio||null,
+    portfolio_file_url: fd.extra?.portfolioFileUrl||null,
     photo_url: fd.basic.photoUrl||null,
     veterans_status: fd.basic.veterans||'비해당',
     veterans_number: fd.basic.veteransNum||null,
@@ -910,7 +911,7 @@ function buildExtra(){
   <div class="photo-upload" onclick="document.getElementById('pfFile').click()" style="border-radius:var(--radius-xs);">
     <span style="font-size:20px;">📎</span><div><div style="font-size:13px;font-weight:500;" id="pfFN">파일 선택 (PDF, ZIP, PPTX)</div><div style="font-size:11px;color:var(--text3);margin-top:2px;">최대 20MB</div></div>
   </div>
-  <input type="file" id="pfFile" accept=".pdf,.zip,.pptx" style="display:none" onchange="document.getElementById('pfFN').textContent=this.files[0]?.name||'파일 선택'"></div>`;
+  <input type="file" id="pfFile" accept=".pdf,.zip,.pptx" style="display:none" onchange="uploadPortfolioFile(this)"></div>`;
   w.appendChild(pc);return w;
 }
 function mkCertEntry(c,i){const d=mk('entry-block');d.id='cert'+i;d.innerHTML=`<div class="entry-header"><span class="entry-label">자격증 ${i+1}</span>${i>0?`<button class="entry-remove" onclick="rmEntry('extra.certs',${i},'cert${i}')">삭제</button>`:''}</div><div class="field-row three"><div class="field"><label class="field-label">자격증명 <span class="required">*</span></label><input type="text" data-ci2="${i}" data-k="name" value="${c.name||''}" placeholder="정보처리기사"></div><div class="field"><label class="field-label">발급 기관</label><input type="text" data-ci2="${i}" data-k="issuer" value="${c.issuer||''}" placeholder="한국산업인력공단"></div><div class="field"><label class="field-label">취득년월</label><input type="month" data-ci2="${i}" data-k="date" value="${c.date||''}"></div></div>`;return d;}
@@ -1035,6 +1036,23 @@ function g(id){const el=document.getElementById(id);return el?el.value:'';}
 function rmEntry(arr,idx,elId){const p=arr.split('.');if(p.length===1)fd[arr].splice(idx,1);else fd[p[0]][p[1]].splice(idx,1);document.getElementById(elId)?.remove();}
 function selRadio(input,groupId){document.querySelectorAll('#'+groupId+' .radio-item').forEach(l=>l.classList.remove('selected'));input.closest('.radio-item').classList.add('selected');}
 function selCheck(input){input.closest('.check-item').classList.toggle('selected',input.checked);}
+async function uploadPortfolioFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('pfFN').textContent = file.name + ' (업로드 중...)';
+  try {
+    const ext = file.name.split('.').pop();
+    const path = `portfolios/${currentUser.id}_${Date.now()}.${ext}`;
+    const { error } = await sb.storage.from('applicant-files').upload(path, file, { upsert: true });
+    if (error) { document.getElementById('pfFN').textContent = '업로드 실패: ' + error.message; return; }
+    const { data } = sb.storage.from('applicant-files').getPublicUrl(path);
+    fd.extra.portfolioFileUrl = data.publicUrl;
+    document.getElementById('pfFN').textContent = file.name + ' ✓';
+  } catch(e) {
+    document.getElementById('pfFN').textContent = '업로드 실패';
+  }
+}
+
 function calcAgeVal(birth) {
   if (!birth) return '';
   const b = new Date(birth), today = new Date();
@@ -1064,20 +1082,59 @@ function rmSkill(v){skills=skills.filter(s=>s!==v);document.querySelectorAll(`.s
 async function previewPhoto(input){
   if(!input.files[0])return;
   const file=input.files[0];
+  // 이미지 압축 (1MB 이하로)
+  const compressedBlob = await compressImage(file, 0.9);
   // 미리보기
   const r=new FileReader();
   r.onload=e=>{const p=document.getElementById('photoPreview');p.innerHTML=`<img src="${e.target.result}" alt="증명사진" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;};
-  r.readAsDataURL(file);
+  r.readAsDataURL(compressedBlob);
   // Storage 업로드
   try {
-    const ext = file.name.split('.').pop();
-    const path = `photos/${currentUser.id}_${Date.now()}.${ext}`;
-    const { error } = await sb.storage.from('applicant-files').upload(path, file, { upsert: true });
+    const path = `photos/${currentUser.id}_${Date.now()}.jpg`;
+    const { error } = await sb.storage.from('applicant-files').upload(path, compressedBlob, { upsert: true, contentType: 'image/jpeg' });
     if (!error) {
       const { data } = sb.storage.from('applicant-files').getPublicUrl(path);
       fd.basic.photoUrl = data.publicUrl;
+    } else {
+      showToast('사진 업로드 실패: ' + error.message);
     }
   } catch(e) { console.log('사진 업로드 실패', e); }
+}
+
+// 이미지 압축 (Canvas 사용, 1MB 이하)
+function compressImage(file, quality=0.8) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      // 최대 800x1000 리사이즈
+      let w = img.width, h = img.height;
+      const maxW = 800, maxH = 1000;
+      if (w > maxW || h > maxH) {
+        const ratio = Math.min(maxW/w, maxH/h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      // 품질 조절해서 1MB 이하로
+      let q = quality;
+      const tryCompress = () => {
+        canvas.toBlob(blob => {
+          if (blob.size > 900*1024 && q > 0.4) {
+            q -= 0.1;
+            tryCompress();
+          } else {
+            resolve(blob);
+          }
+        }, 'image/jpeg', q);
+      };
+      tryCompress();
+    };
+    img.src = url;
+  });
 }
 function showLoading(txt){document.getElementById('loadingText').textContent=txt||'처리 중...';document.getElementById('loadingOverlay').classList.remove('hidden');}
 function hideLoading(){document.getElementById('loadingOverlay').classList.add('hidden');}
