@@ -1298,10 +1298,12 @@ async function passApplicant() {
       showToast('✓ 1차면접으로 이동했습니다');
       updateModalStage('1차면접');
     } else if (role === 'manager') {
-      // 이 공고에 배정된 manager인지 확인
-      const { data: perm } = await sb.from('admin_permissions')
-        .select('id').eq('admin_id', currentAdmin.id).eq('job_posting_id', app.job_posting_id).maybeSingle();
-      if (!perm) { showToast('이 공고의 담당 관리자만 합격 처리할 수 있습니다'); return; }
+      // 이 공고에 배정된 manager OR 면접관으로 지정된 경우 가능
+      const [{ data: perm }, { data: ivPerm }] = await Promise.all([
+        sb.from('admin_job_permissions').select('id').eq('admin_id', currentAdmin.id).eq('job_posting_id', app.job_posting_id).maybeSingle(),
+        sb.from('job_interviewers').select('id').eq('admin_id', currentAdmin.id).eq('job_id', app.job_posting_id).maybeSingle()
+      ]);
+      if (!perm && !ivPerm) { showToast('이 공고의 담당 관리자 또는 면접관만 합격 처리할 수 있습니다'); return; }
       await updateStageById(currentAppId, '1차면접');
       showToast('✓ 1차면접으로 이동했습니다');
       updateModalStage('1차면접');
@@ -1489,10 +1491,12 @@ async function failApplicant() {
 }
 
 async function updateStageById(id, stage) {
-  await sb.from('applications').update({ stage, updated_at: new Date().toISOString() }).eq('id', id);
+  const { error } = await sb.from('applications').update({ stage, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showToast('저장 실패: ' + error.message); return false; }
   const app = allApps.find(a => a.id === id);
   if (app) app.stage = stage;
   renderPipeline();
+  return true;
 }
 
 function updateModalStage(stage) {
