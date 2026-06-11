@@ -95,21 +95,21 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .app-card-date{font-size:10px;color:var(--text3);margin-top:6px}
 
 /* 공고 대시보드 */
-.job-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:4px 0}
-.job-dash-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
-.job-dash-card:hover{border-color:var(--accent);box-shadow:0 4px 16px rgba(83,74,183,.12);transform:translateY(-1px)}
-.job-dash-card-title{font-size:15px;font-weight:600;margin-bottom:4px;color:var(--text)}
-.job-dash-card-dept{font-size:12px;color:var(--text3);margin-bottom:14px}
-.job-dash-card-stats{display:flex;gap:10px;flex-wrap:wrap}
-.job-dash-stat{display:flex;flex-direction:column;align-items:center;padding:8px 14px;border-radius:var(--rxs);min-width:60px}
-.job-dash-stat-val{font-size:20px;font-weight:600;line-height:1}
-.job-dash-stat-label{font-size:10px;color:var(--text3);margin-top:3px;white-space:nowrap}
-.job-dash-status{position:absolute;top:14px;right:14px;font-size:10px;padding:2px 8px;border-radius:20px}
+.job-dash-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:4px 0}
+.job-dash-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:28px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
+.job-dash-card:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(83,74,183,.14);transform:translateY(-2px)}
+.job-dash-card-title{font-size:18px;font-weight:700;margin-bottom:6px;color:#1a1a1a;padding-right:70px}
+.job-dash-card-dept{font-size:13px;color:#444;margin-bottom:20px}
+.job-dash-card-stats{display:flex;gap:12px;flex-wrap:wrap}
+.job-dash-stat{display:flex;flex-direction:column;align-items:center;padding:12px 18px;border-radius:var(--rxs);min-width:72px}
+.job-dash-stat-val{font-size:26px;font-weight:700;line-height:1;color:#1a1a1a}
+.job-dash-stat-label{font-size:12px;color:#444;margin-top:4px;white-space:nowrap;font-weight:500}
+.job-dash-status{position:absolute;top:18px;right:18px;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600}
 /* 면접관 승인 배지 */
 .interviewer-badges{display:flex;gap:4px;flex-wrap:wrap;margin-top:7px}
-.iv-badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:500}
+.iv-badge{display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 10px;border-radius:20px;font-weight:600}
 .iv-badge.ok{background:#EAF3DE;color:#27500A}
-.iv-badge.pending{background:#F1EFE8;color:#888780}
+.iv-badge.pending{background:#F1EFE8;color:#555}
 .iv-badge.mine-pending{background:#FEF3E2;color:#7A3D00;border:1px solid #F5CFA0}
 /* 통계 */
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
@@ -1003,7 +1003,7 @@ async function loadDashboard() {
           <div class="job-dash-stat-label">최종합격</div>
         </div>
       </div>
-      ${myPendingCount > 0 ? `<div style="margin-top:10px;padding:7px 10px;background:#FEF3E2;border-radius:var(--rxs);font-size:12px;color:#7A3D00;font-weight:500">⚠ 내 면접 승인 대기: ${myPendingCount}명</div>` : ''}
+      ${myPendingCount > 0 ? `<div style="margin-top:14px;padding:10px 14px;background:#FEF3E2;border-radius:var(--rxs);font-size:14px;color:#5A2D00;font-weight:700;border:1.5px solid #F5CFA0">⚠ 내 면접 승인 대기: ${myPendingCount}명</div>` : ''}
       ${jInterviewers.length > 0 ? renderInterviewerBadgesSummary(j.id, jobApps, jInterviewers, allApprovals||[]) : ''}
     </div>`;
   }).join('');
@@ -1028,7 +1028,7 @@ function renderInterviewerBadgesSummary(jobId, jobApps, interviewers, allApprova
     </span>`;
   }).join('');
 
-  return `<div style="margin-top:8px;font-size:10px;color:var(--text3);margin-bottom:3px">면접관 승인 현황</div>
+  return `<div style="margin-top:12px;font-size:12px;color:#444;font-weight:600;margin-bottom:5px">면접관 승인 현황</div>
     <div class="interviewer-badges">${summary}</div>`;
 }
 
@@ -1104,16 +1104,30 @@ async function passApplicant() {
   const role = adminProfile?.role;
 
   if (stage === '지원완료' || stage === '서류검토' || stage === '서류합격') {
-    // 담당자(superadmin/manager) → 관리자검토로
+    // 슈퍼어드민만 관리자검토로 이동 가능
+    if (role !== 'superadmin') { showToast('슈퍼어드민만 서류 합격 처리할 수 있습니다'); return; }
     await updateStageById(currentAppId, '관리자검토');
     showToast('✓ 관리자 검토 단계로 이동했습니다');
     updateModalStage('관리자검토');
 
   } else if (stage === '관리자검토') {
-    // superadmin/manager → 1차면접으로
-    await updateStageById(currentAppId, '1차면접');
-    showToast('✓ 1차면접으로 이동했습니다');
-    updateModalStage('1차면접');
+    // 이 공고에 배정된 manager만 1차면접으로 이동 가능
+    if (role === 'superadmin') {
+      // 슈퍼어드민은 항상 가능
+      await updateStageById(currentAppId, '1차면접');
+      showToast('✓ 1차면접으로 이동했습니다');
+      updateModalStage('1차면접');
+    } else if (role === 'manager') {
+      // 이 공고에 배정된 manager인지 확인
+      const { data: perm } = await sb.from('admin_permissions')
+        .select('id').eq('admin_id', currentAdmin.id).eq('job_posting_id', app.job_posting_id).maybeSingle();
+      if (!perm) { showToast('이 공고의 담당 관리자만 합격 처리할 수 있습니다'); return; }
+      await updateStageById(currentAppId, '1차면접');
+      showToast('✓ 1차면접으로 이동했습니다');
+      updateModalStage('1차면접');
+    } else {
+      showToast('권한이 없습니다');
+    }
 
   } else if (stage === '1차면접') {
     // 슈퍼어드민이면 면접관 전원OK 여부 확인 후 2차면접 팝업
