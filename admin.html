@@ -2798,20 +2798,17 @@ async function renderInterviewSession(app) {
   const c = document.getElementById('ivSessionContent');
   if (!app) { c.innerHTML = '<div class="empty-state">지원자 정보를 찾을 수 없습니다</div>'; return; }
 
-  // 이력서 데이터 로드 (application_id 또는 user_id 기반)
+  // 이력서 데이터 로드 (application_id 기반)
   const appId2 = _ivSessionAppId;
-  // applications 테이블에서 user_id 직접 가져오기
-  const { data: appData } = await sb.from('applications').select('user_id').eq('id', appId2).maybeSingle();
-  const userId = appData?.user_id || app.user_id;
   const [
     { data: edus }, { data: careers }, { data: certs },
     { data: awards }, { data: langs }, { data: myEval }
   ] = await Promise.all([
-    userId ? sb.from('education').select('*').eq('user_id', userId).order('start_month', {ascending:false}) : Promise.resolve({data:[]}),
-    userId ? sb.from('work_experience').select('*').eq('user_id', userId).order('start_month', {ascending:false}) : Promise.resolve({data:[]}),
-    userId ? sb.from('certifications').select('*').eq('user_id', userId) : Promise.resolve({data:[]}),
-    userId ? sb.from('awards').select('*').eq('user_id', userId) : Promise.resolve({data:[]}),
-    userId ? sb.from('language_skills').select('*').eq('user_id', userId) : Promise.resolve({data:[]}),
+    sb.from('education').select('*').eq('application_id', appId2).order('start_month', {ascending:false}),
+    sb.from('work_experience').select('*').eq('application_id', appId2).order('start_month', {ascending:false}),
+    sb.from('certifications').select('*').eq('application_id', appId2),
+    sb.from('awards').select('*').eq('application_id', appId2),
+    sb.from('language_skills').select('*').eq('application_id', appId2),
     sb.from('interview_evaluations').select('*')
       .eq(_ivSessionIsDispatch ? 'dispatch_candidate_id' : 'application_id', _ivSessionAppId)
       .eq('interview_round', _ivSessionRound)
