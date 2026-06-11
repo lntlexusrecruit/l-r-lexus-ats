@@ -243,8 +243,10 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         </div>
         <div class="sb-label" style="margin-top:8px">파견직</div>
         <button class="sb-link" id="dispatchMenu" onclick="showPage('dispatch',this)">🚌 파견직 관리 <span class="sb-badge" id="sbDispatch">0</span></button>
-        <button class="sb-link" id="dispatchAgenciesMenuBtn" onclick="showPage('dispatchagencies',this)">🏢 파견업체 관리</button>
-        <button class="sb-link" id="dispatchAdminsMenuBtn" onclick="showPage('dispatchadmins',this)">👤 파견 담당자 관리</button>
+        <div id="dispatchMgmtMenu">
+          <button class="sb-link" id="dispatchAgenciesMenuBtn" onclick="showPage('dispatchagencies',this)">🏢 파견업체 관리</button>
+          <button class="sb-link" id="dispatchAdminsMenuBtn" onclick="showPage('dispatchadmins',this)">👤 파견 담당자 관리</button>
+        </div>
         <div id="superAdminMenu" class="hidden">
           <div class="sb-label" style="margin-top:8px">슈퍼어드민</div>
           <button class="sb-link" onclick="showPage('admins',this)">⊙ 관리자 관리</button>
@@ -518,6 +520,10 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     </div>
     <div class="field"><label>직무 설명</label><textarea id="jDesc" rows="3" placeholder="담당 업무를 입력하세요"></textarea></div>
     <div class="field"><label>자격 요건</label><textarea id="jReq" rows="3" placeholder="필요한 역량/경험을 입력하세요"></textarea></div>
+    <div class="field">
+      <label>1차면접 면접관 지정 <span style="font-size:11px;font-weight:400;color:var(--text3)">(전원 승인 시 다음 단계 진행)</span></label>
+      <div id="jInterviewers" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:200px;overflow-y:auto"></div>
+    </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn" onclick="closeJobForm()">취소</button>
       <button class="btn btn-primary" onclick="saveJob()">저장</button>
@@ -577,6 +583,11 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     </div>
     <div class="field"><label>업무 내용</label><textarea id="djDesc" rows="3" placeholder="파견 업무 내용"></textarea></div>
     <div class="field"><label>담당자 지정</label><div id="djManagers" style="display:flex;flex-direction:column;gap:6px;max-height:150px;overflow-y:auto"></div></div>
+    <div class="field">
+      <label>1차면접 면접관 지정 <span style="font-size:11px;font-weight:400;color:var(--text3)">(전원 승인 시 다음 단계 진행)</span></label>
+      <div id="djInterviewers" style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:200px;overflow-y:auto"></div>
+    </div>
+    <div class="err hidden" id="djErr"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button class="btn" onclick="closeDispatchJobForm()">취소</button>
       <button class="btn btn-primary" onclick="saveDispatchJob()">저장</button>
@@ -609,8 +620,8 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     <div class="field"><label>연락처</label><input type="text" id="ruPhone" placeholder="010-0000-0000"></div>
     <div class="field">
       <label>이력서 파일 * <span style="font-size:11px;font-weight:400;color:var(--text3)">(여러 개 선택 가능)</span></label>
-      <input type="file" id="ruFile" accept=".pdf,.doc,.docx,.hwp,.xls,.xlsx" multiple style="font-family:'Pretendard',sans-serif;font-size:13px;padding:8px 0;width:100%">
-      <div style="font-size:12px;color:var(--text3);margin-top:4px">PDF, Word, HWP, Excel 지원 · 파일당 최대 5MB · 동시 업로드 가능</div>
+      <input type="file" id="ruFile" accept=".pdf" multiple style="font-family:'Pretendard',sans-serif;font-size:13px;padding:8px 0;width:100%">
+      <div style="font-size:12px;color:var(--text3);margin-top:4px">PDF만 지원 · 파일당 최대 5MB · 동시 업로드 가능</div>
     </div>
     <div id="ruFileList" style="display:none;margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
     <div class="field"><label>메모</label><textarea id="ruMemo" rows="2" placeholder="특이사항 등 (전체 파일에 공통 적용)"></textarea></div>
@@ -630,10 +641,16 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     <div class="field"><label>이메일 *</label><input type="email" id="dAdEmail" placeholder="manager@company.com"></div>
     <div class="field"><label>임시 비밀번호 *</label><input type="text" id="dAdPw" placeholder="8자 이상"></div>
     <div class="field"><label>부서</label><input type="text" id="dAdDept" placeholder="인사총무팀"></div>
-    <div style="padding:10px;background:#EAF3DE;border-radius:var(--rxs);font-size:13px;color:#27500A;margin-bottom:4px">
-      ✅ 파견 담당자는 모든 파견 공고에 자동 접근됩니다
+    <div class="field">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer">
+        <input type="checkbox" id="dAdIsSuper" style="accent-color:var(--accent);width:16px;height:16px" onchange="toggleDAdPerms()">
+        <span>슈퍼파견담당자 <span style="font-size:11px;font-weight:400;color:var(--text3)">(모든 파견 공고 접근)</span></span>
+      </label>
     </div>
-    <div id="dAdPerms" style="display:none"></div>
+    <div id="dAdPermsWrap" class="field">
+      <label>접근 가능 파견 공고</label>
+      <div id="dAdPerms" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;margin-top:6px"></div>
+    </div>
     <div class="err hidden" id="dAdErr"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
       <button class="btn" onclick="closeDispatchAdminForm()">취소</button>
@@ -646,11 +663,13 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 <script>
 // ── 파이프라인 설정 ───────────────────────────────────────
 const PIPELINE = [
-  { key: '지원완료',   label: '지원자',          color: '#888780', bg: '#F1EFE8', textColor: '#5F5E5A' },
-  { key: '1차면접',    label: '서류합격/1차면접', color: '#534AB7', bg: '#EEEDFE', textColor: '#3C3489' },
-  { key: '2차면접',    label: '2차면접',          color: '#185FA5', bg: '#E6F1FB', textColor: '#0C447C' },
-  { key: '최종합격',   label: '최종합격',         color: '#3B6D11', bg: '#EAF3DE', textColor: '#27500A' },
-  { key: '불합격',     label: '불합격',           color: '#A32D2D', bg: '#FCEBEB', textColor: '#A32D2D' },
+  { key: '지원완료',    label: '지원자',           color: '#888780', bg: '#F1EFE8', textColor: '#5F5E5A' },
+  { key: '관리자검토',  label: '관리자 검토',       color: '#B25C00', bg: '#FEF3E2', textColor: '#7A3D00' },
+  { key: '1차면접',     label: '1차면접',           color: '#534AB7', bg: '#EEEDFE', textColor: '#3C3489' },
+  { key: '면접관검토',  label: '면접관 검토',       color: '#0C6E8A', bg: '#E0F4FA', textColor: '#084F63' },
+  { key: '2차면접',     label: '2차면접',           color: '#185FA5', bg: '#E6F1FB', textColor: '#0C447C' },
+  { key: '최종합격',    label: '최종합격',          color: '#3B6D11', bg: '#EAF3DE', textColor: '#27500A' },
+  { key: '불합격',      label: '불합격',            color: '#A32D2D', bg: '#FCEBEB', textColor: '#A32D2D' },
 ];
 
 const AV_COLORS=[{bg:'#EEEDFE',color:'#3C3489'},{bg:'#E1F5EE',color:'#085041'},{bg:'#FAEEDA',color:'#633806'},{bg:'#E6F1FB',color:'#0C447C'},{bg:'#EAF3DE',color:'#27500A'},{bg:'#FCEBEB',color:'#A32D2D'}];
@@ -724,8 +743,10 @@ async function showApp() {
   if (isAgency) {
     // 파견업체 로그인: 파견직 관리만 보이게
     document.getElementById('recruitMenu').classList.add('hidden');
-    document.getElementById('dispatchAdminsMenuBtn').classList.add('hidden');
-    document.getElementById('dispatchAgenciesMenuBtn').classList.add('hidden');
+    document.getElementById('dispatchMgmtMenu').classList.add('hidden');
+    // superAdminMenu도 숨기기
+    const saMenu = document.getElementById('superAdminMenu');
+    if (saMenu) saMenu.classList.add('hidden');
     // 파견직 파이프라인 바로 오픈
     showPage('dispatch', document.getElementById('dispatchMenu'));
     await loadDispatchJobs();
@@ -783,7 +804,7 @@ function renderJobs() {
   `).join('');
 }
 
-function openJobForm(jobId = null) {
+async function openJobForm(jobId = null) {
   editJobId = jobId;
   document.getElementById('jobFormTitle').textContent = jobId ? '채용 공고 수정' : '채용 공고 등록';
   if (jobId) {
@@ -802,6 +823,20 @@ function openJobForm(jobId = null) {
     document.getElementById('jType').value = '정규직';
     document.getElementById('jActive').value = 'true';
   }
+  // 면접관 체크박스 렌더링
+  const interEl = document.getElementById('jInterviewers');
+  if (interEl) {
+    const managers = allAdmins.filter(a => a.role === 'manager' || a.role === 'superadmin');
+    // 기존 지정 면접관 로드
+    let existingIds = [];
+    if (jobId) {
+      const { data: existing } = await sb.from('job_interviewers').select('admin_id').eq('job_id', jobId);
+      existingIds = (existing||[]).map(e => e.admin_id);
+    }
+    interEl.innerHTML = managers.length
+      ? managers.map(a => `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:8px;border:0.5px solid var(--border);border-radius:var(--rxs)"><input type="checkbox" name="jInterviewer" value="${a.id}" ${existingIds.includes(a.id)?'checked':''} style="accent-color:var(--accent)"> ${a.name} (${a.department||'-'})</label>`).join('')
+      : '<div style="font-size:12px;color:var(--text3)">등록된 관리자가 없습니다</div>';
+  }
   document.getElementById('jobFormModal').classList.remove('hidden');
 }
 function closeJobForm() { document.getElementById('jobFormModal').classList.add('hidden'); editJobId = null; }
@@ -810,8 +845,21 @@ async function saveJob() {
   const title = document.getElementById('jTitle').value.trim();
   if (!title) { showToast('공고 제목을 입력하세요'); return; }
   const payload = { title, department: document.getElementById('jDept').value, location: document.getElementById('jLocation').value, employment_type: document.getElementById('jType').value, is_active: document.getElementById('jActive').value === 'true', description: document.getElementById('jDesc').value, requirements: document.getElementById('jReq').value, updated_at: new Date().toISOString() };
-  const { error } = editJobId ? await sb.from('job_postings').update(payload).eq('id', editJobId) : await sb.from('job_postings').insert(payload);
-  if (error) { showToast('오류: ' + error.message); return; }
+  let jobId = editJobId;
+  if (editJobId) {
+    const { error } = await sb.from('job_postings').update(payload).eq('id', editJobId);
+    if (error) { showToast('오류: ' + error.message); return; }
+  } else {
+    const { data, error } = await sb.from('job_postings').insert(payload).select().single();
+    if (error) { showToast('오류: ' + error.message); return; }
+    jobId = data.id;
+  }
+  // 면접관 저장
+  const checkedInterviewers = Array.from(document.querySelectorAll('#jInterviewers input[name="jInterviewer"]:checked')).map(c => c.value);
+  await sb.from('job_interviewers').delete().eq('job_id', jobId);
+  if (checkedInterviewers.length) {
+    await sb.from('job_interviewers').insert(checkedInterviewers.map(aid => ({ job_id: jobId, admin_id: aid })));
+  }
   closeJobForm(); await loadJobs(); showToast(editJobId ? '✓ 공고 수정 완료' : '✓ 공고 등록 완료');
 }
 
@@ -900,40 +948,114 @@ async function passApplicant() {
   const app = allApps.find(a => a.id === currentAppId);
   if (!app) return;
   const stage = app.stage || '지원완료';
+  const role = adminProfile?.role;
 
   if (stage === '지원완료' || stage === '서류검토' || stage === '서류합격') {
-    // → 1차면접으로 이동
+    // 담당자(superadmin/manager) → 관리자검토로
+    await updateStageById(currentAppId, '관리자검토');
+    showToast('✓ 관리자 검토 단계로 이동했습니다');
+    updateModalStage('관리자검토');
+
+  } else if (stage === '관리자검토') {
+    // superadmin/manager → 1차면접으로
     await updateStageById(currentAppId, '1차면접');
     showToast('✓ 1차면접으로 이동했습니다');
     updateModalStage('1차면접');
+
   } else if (stage === '1차면접') {
-    // 2차면접 여부 확인
-    showConfirm(
-      '합격 처리',
-      '2차 면접이 필요한 지원자인가요?',
-      async (yes) => {
-        if (yes) {
-          await updateStageById(currentAppId, '2차면접');
-          showToast('✓ 2차면접으로 이동했습니다');
-          updateModalStage('2차면접');
-        } else {
-          await updateStageById(currentAppId, '최종합격');
-          showToast('🎉 최종합격 처리되었습니다');
-          updateModalStage('최종합격');
-        }
+    // 면접관 전원 승인 확인 후 면접관검토로
+    await handleInterviewApproval(currentAppId, app);
+
+  } else if (stage === '면접관검토') {
+    // superadmin/manager → 2차면접 여부 확인
+    showConfirm('합격 처리', '2차 면접이 필요한 지원자인가요?', async (yes) => {
+      if (yes) {
+        await updateStageById(currentAppId, '2차면접');
+        showToast('✓ 2차면접으로 이동했습니다');
+        updateModalStage('2차면접');
+      } else {
+        await updateStageById(currentAppId, '최종합격');
+        showToast('🎉 최종합격 처리되었습니다');
+        updateModalStage('최종합격');
       }
-    );
+    });
+
   } else if (stage === '2차면접') {
     await updateStageById(currentAppId, '최종합격');
     showToast('🎉 최종합격 처리되었습니다');
     updateModalStage('최종합격');
+
   } else if (stage === '최종합격') {
     showToast('이미 최종합격 상태입니다');
+
   } else {
-    // 불합격 → 복구 시 1차면접으로
-    await updateStageById(currentAppId, '1차면접');
-    showToast('✓ 1차면접으로 이동했습니다');
-    updateModalStage('1차면접');
+    // 불합격 → 복구
+    await updateStageById(currentAppId, '관리자검토');
+    showToast('✓ 관리자 검토로 복구했습니다');
+    updateModalStage('관리자검토');
+  }
+}
+
+// 면접관 개별 승인 처리 (일반채용)
+async function handleInterviewApproval(appId, app) {
+  // 이 공고의 면접관 목록
+  const { data: interviewers } = await sb.from('job_interviewers')
+    .select('admin_id, admin_profiles(name)')
+    .eq('job_id', app.job_posting_id);
+
+  if (!interviewers?.length) {
+    // 면접관 미지정 → 관리자가 바로 면접관검토로 넘김
+    showConfirm('면접관 미지정', '이 공고에 지정된 면접관이 없습니다. 바로 다음 단계로 진행할까요?', async (yes) => {
+      if (!yes) return;
+      await updateStageById(appId, '면접관검토');
+      showToast('✓ 면접관 검토 단계로 이동했습니다');
+      updateModalStage('면접관검토');
+    });
+    return;
+  }
+
+  // 현재 승인 현황
+  const { data: approvals } = await sb.from('interview_approvals')
+    .select('admin_id, admin_profiles(name)')
+    .eq('application_id', appId);
+  const approvedIds = (approvals||[]).map(a => a.admin_id);
+
+  // 내가 이미 승인했는지 확인
+  const myId = currentAdmin.id;
+  const iAmInterviewer = interviewers.some(i => i.admin_id === myId);
+
+  if (iAmInterviewer && !approvedIds.includes(myId)) {
+    // 내 승인 추가
+    await sb.from('interview_approvals').insert({ application_id: appId, admin_id: myId });
+    approvedIds.push(myId);
+  }
+
+  const total = interviewers.length;
+  const done = approvedIds.length;
+
+  // 승인 현황 표시
+  const statusLines = interviewers.map(i => {
+    const ok = approvedIds.includes(i.admin_id);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:16px">${ok ? '✅' : '⬜'}</span>
+      <span style="font-size:13px">${i.admin_profiles?.name || '-'}</span>
+      <span style="font-size:11px;color:${ok?'var(--g600)':'var(--text3)'};margin-left:auto">${ok?'승인':'대기'}</span>
+    </div>`;
+  }).join('');
+
+  if (done >= total) {
+    // 전원 승인 → 면접관검토로
+    await updateStageById(appId, '면접관검토');
+    showToast(`✓ 면접관 전원 승인 완료! 면접관 검토 단계로 이동했습니다`);
+    updateModalStage('면접관검토');
+  } else {
+    // 아직 미승인자 있음 → 현황 표시
+    showConfirm(`면접관 승인 현황 (${done}/${total})`, '', null);
+    document.getElementById('confirmSub').innerHTML = `<div style="margin-top:8px">${statusLines}</div><div style="margin-top:12px;font-size:12px;color:var(--text3)">전원 승인 시 자동으로 다음 단계로 이동합니다</div>`;
+    document.getElementById('confirmYes').style.display = 'none';
+    document.getElementById('confirmNo').textContent = '닫기';
+    document.getElementById('confirmNo').onclick = () => { closeConfirmModal(); };
+    if (iAmInterviewer) showToast('✓ 승인 완료했습니다');
   }
 }
 
@@ -1442,10 +1564,12 @@ let currentDispatchJobId = null;
 let allDispatchCandidates = [];
 
 const DISPATCH_PIPELINE = [
-  { key: '지원', label: '지원자', color: '#888780', bg: '#F1EFE8', textColor: '#5F5E5A' },
-  { key: '1차면접', label: '1차면접', color: '#534AB7', bg: '#EEEDFE', textColor: '#3C3489' },
-  { key: '합격', label: '합격', color: '#3B6D11', bg: '#EAF3DE', textColor: '#27500A' },
-  { key: '불합격', label: '불합격', color: '#A32D2D', bg: '#FCEBEB', textColor: '#A32D2D' },
+  { key: '지원',       label: '지원자',      color: '#888780', bg: '#F1EFE8', textColor: '#5F5E5A' },
+  { key: '관리자검토', label: '관리자 검토', color: '#B25C00', bg: '#FEF3E2', textColor: '#7A3D00' },
+  { key: '1차면접',    label: '1차면접',     color: '#534AB7', bg: '#EEEDFE', textColor: '#3C3489' },
+  { key: '면접관검토', label: '면접관 검토', color: '#0C6E8A', bg: '#E0F4FA', textColor: '#084F63' },
+  { key: '합격',       label: '합격',        color: '#3B6D11', bg: '#EAF3DE', textColor: '#27500A' },
+  { key: '불합격',     label: '불합격',      color: '#A32D2D', bg: '#FCEBEB', textColor: '#A32D2D' },
 ];
 
 async function loadDispatchJobs() {
@@ -1458,10 +1582,14 @@ async function loadDispatchJobs() {
   let query = sb.from('dispatch_postings').select('*, dispatch_agencies(name, contact_name, phone, email)').order('created_at', { ascending: false });
   const role = adminProfile?.role;
   if (role === 'agency') {
-    // 파견업체 계정: dispatch_agencies.id = currentAdmin.id 인 공고만
-    const myAgency = allAgencies.find(a => a.id === currentAdmin.id);
+    // 파견업체 계정: auth.users.id OR email로 dispatch_agencies 찾기
+    let myAgency = allAgencies.find(a => a.id === currentAdmin.id);
     if (!myAgency) {
-      c.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>연결된 파견업체 정보가 없습니다</p></div>';
+      // id 불일치 시 email로 fallback
+      myAgency = allAgencies.find(a => a.email === currentAdmin.email);
+    }
+    if (!myAgency) {
+      c.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>연결된 파견업체 정보가 없습니다<br><small>관리자에게 문의하세요</small></p></div>';
       return;
     }
     query = query.eq('agency_id', myAgency.id);
@@ -1564,7 +1692,9 @@ async function openDispatchCandidate(id) {
   showConfirm(cand.name, '단계를 선택하세요', null);
   document.getElementById('confirmSub').innerHTML = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px">'
     + DISPATCH_PIPELINE.map(p => `<button class="btn" style="background:${p.bg};color:${p.textColor};border-color:${p.color}30;padding:10px" onclick="updateDispatchStage('${id}','${p.key}')">${p.label}${(cand.stage||'지원')===p.key?' ✓ 현재':''}</button>`).join('')
-    + (cand.resume_url ? '<a href="'+cand.resume_url+'" target="_blank" class="btn" style="text-align:center;text-decoration:none">📎 이력서 보기</a>' : '')
+    + `<button class="btn btn-pass" style="padding:8px 16px" onclick="passDispatchCandidate('${id}')">✓ 합격</button>`
+      + `<button class="btn btn-fail" style="padding:8px 16px" onclick="updateDispatchStage('${id}','불합격')">✕ 불합격</button>`
+      + (cand.resume_url ? '<a href="'+cand.resume_url+'" target="_blank" class="btn" style="text-align:center;text-decoration:none">📎 이력서 보기</a>' : '')
     + '</div>';
   document.getElementById('confirmYes').style.display = 'none';
   document.getElementById('confirmNo').textContent = '닫기';
@@ -1574,6 +1704,86 @@ async function openDispatchCandidate(id) {
     document.getElementById('confirmNo').textContent = '아니요';
     document.getElementById('confirmNo').onclick = () => confirmAction(false);
   };
+}
+
+// 파견직 합격 처리
+async function passDispatchCandidate(id) {
+  // id = dispatch_candidate id
+  // allDispatchCandidates에서 찾기
+  const cand = (window._dispatchCands||[]).find(c => c.id === id);
+  if (!cand) return;
+  const stage = cand.stage || '지원';
+  const role = adminProfile?.role;
+
+  if (stage === '지원') {
+    await updateDispatchStage(id, '관리자검토');
+    showToast('✓ 관리자 검토 단계로 이동했습니다');
+
+  } else if (stage === '관리자검토') {
+    await updateDispatchStage(id, '1차면접');
+    showToast('✓ 1차면접으로 이동했습니다');
+
+  } else if (stage === '1차면접') {
+    await handleDispatchInterviewApproval(id, cand);
+
+  } else if (stage === '면접관검토') {
+    await updateDispatchStage(id, '합격');
+    showToast('🎉 합격 처리되었습니다');
+
+  } else if (stage === '합격') {
+    showToast('이미 합격 상태입니다');
+  }
+}
+
+async function handleDispatchInterviewApproval(candId, cand) {
+  const { data: interviewers } = await sb.from('dispatch_job_interviewers')
+    .select('admin_id, admin_profiles(name)')
+    .eq('dispatch_posting_id', cand.dispatch_posting_id);
+
+  if (!interviewers?.length) {
+    showConfirm('면접관 미지정', '이 공고에 지정된 면접관이 없습니다. 바로 다음 단계로 진행할까요?', async (yes) => {
+      if (!yes) return;
+      await updateDispatchStage(candId, '면접관검토');
+      showToast('✓ 면접관 검토 단계로 이동했습니다');
+    });
+    return;
+  }
+
+  const { data: approvals } = await sb.from('dispatch_interview_approvals')
+    .select('admin_id, admin_profiles(name)')
+    .eq('dispatch_candidate_id', candId);
+  const approvedIds = (approvals||[]).map(a => a.admin_id);
+  const myId = currentAdmin.id;
+  const iAmInterviewer = interviewers.some(i => i.admin_id === myId);
+
+  if (iAmInterviewer && !approvedIds.includes(myId)) {
+    await sb.from('dispatch_interview_approvals').insert({ dispatch_candidate_id: candId, admin_id: myId });
+    approvedIds.push(myId);
+  }
+
+  const total = interviewers.length;
+  const done = approvedIds.length;
+
+  const statusLines = interviewers.map(i => {
+    const ok = approvedIds.includes(i.admin_id);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:0.5px solid var(--border)">
+      <span style="font-size:16px">${ok?'✅':'⬜'}</span>
+      <span style="font-size:13px">${i.admin_profiles?.name||'-'}</span>
+      <span style="font-size:11px;color:${ok?'var(--g600)':'var(--text3)'};margin-left:auto">${ok?'승인':'대기'}</span>
+    </div>`;
+  }).join('');
+
+  if (done >= total) {
+    await updateDispatchStage(candId, '면접관검토');
+    showToast('✓ 면접관 전원 승인! 면접관 검토 단계로 이동했습니다');
+  } else {
+    showConfirm(`면접관 승인 현황 (${done}/${total})`, '', null);
+    document.getElementById('confirmSub').innerHTML = `<div style="margin-top:8px">${statusLines}</div><div style="margin-top:12px;font-size:12px;color:var(--text3)">전원 승인 시 자동으로 다음 단계로 이동합니다</div>`;
+    document.getElementById('confirmYes').style.display = 'none';
+    document.getElementById('confirmNo').textContent = '닫기';
+    document.getElementById('confirmNo').onclick = () => { closeConfirmModal(); };
+    if (iAmInterviewer) showToast('✓ 승인 완료했습니다');
+  }
 }
 
 async function updateDispatchStage(id, stage) {
@@ -1619,9 +1829,15 @@ async function saveDispatchJob() {
     is_active: true
   }).select('id').single();
   if (error) { showToast('오류: ' + error.message); return; }
+  // 담당 관리자 권한
   const checked = Array.from(document.querySelectorAll('#djManagers input:checked')).map(c => c.value);
   if (checked.length) {
     await sb.from('dispatch_permissions').insert(checked.map(aid => ({ admin_id: aid, dispatch_posting_id: data.id })));
+  }
+  // 면접관 저장
+  const checkedInter = Array.from(document.querySelectorAll('#djInterviewers input[name="djInterviewer"]:checked')).map(c => c.value);
+  if (checkedInter.length) {
+    await sb.from('dispatch_job_interviewers').insert(checkedInter.map(aid => ({ dispatch_posting_id: data.id, admin_id: aid })));
   }
   closeDispatchJobForm();
   await loadDispatchJobs();
@@ -1705,6 +1921,8 @@ async function uploadResume() {
   const err = document.getElementById('ruErr');
   err.classList.add('hidden');
   if (!files.length) { err.textContent = '이력서 파일을 선택하세요'; err.classList.remove('hidden'); return; }
+  const nonPdf = files.filter(f => !f.name.toLowerCase().endsWith('.pdf'));
+  if (nonPdf.length) { err.textContent = 'PDF 파일만 업로드 가능합니다: ' + nonPdf.map(f=>f.name).join(', '); err.classList.remove('hidden'); return; }
   // 5MB 초과 파일 체크
   const oversize = files.filter(f => f.size > 5*1024*1024);
   if (oversize.length) { err.textContent = `파일 크기 초과: ${oversize.map(f=>f.name).join(', ')} (최대 5MB)`; err.classList.remove('hidden'); return; }
@@ -1821,21 +2039,68 @@ async function loadDispatchAdmins() {
     c.innerHTML = '<div class="empty-state"><div class="icon">👤</div><p>등록된 파견 담당자가 없습니다<br><small>위 버튼으로 추가하세요</small></p></div>';
     return;
   }
+  const { data: allPerms } = await sb.from('dispatch_permissions').select('admin_id, dispatch_postings(title)');
   c.innerHTML = allAdminList.map(a => {
-    const safeName2 = a.name.replace(/'/g, "\\'");
+    const safeName2 = a.name.replace(/'/g, "\'");
+    const isSuper = a.is_super_dispatch;
+    const perms = (allPerms||[]).filter(p => p.admin_id === a.id);
+    const permBadge = isSuper
+      ? `<span class="perm-tag" style="background:#EAF3DE;color:#27500A">⭐ 슈퍼파견담당자 (전체 공고)</span>`
+      : perms.length
+        ? perms.filter(p=>p.dispatch_postings).map(p=>`<span class="perm-tag">📋 ${p.dispatch_postings.title}</span>`).join('')
+        : `<span style="font-size:11px;color:var(--text3)">배정된 공고 없음</span>`;
     return `<div class="admin-card">
       <div class="avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0">${a.name[0]}</div>
       <div class="admin-info">
-        <div class="admin-name">${a.name} <span class="role-badge role-manager">파견 담당자</span></div>
+        <div class="admin-name">${a.name} <span class="role-badge role-manager">파견 담당자</span>${isSuper?'<span class="role-badge" style="background:#FEF3C7;color:#92400E;margin-left:4px">⭐슈퍼</span>':''}</div>
         <div class="admin-email">${a.email}${a.department?' · '+a.department:''}</div>
-        <div class="admin-perms" style="margin-top:6px"><span class="perm-tag" style="background:#EAF3DE;color:#27500A">✅ 전체 파견 공고 접근 가능</span></div>
+        <div class="admin-perms" style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${permBadge}</div>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
+      <div style="display:flex;gap:6px;flex-shrink:0;flex-direction:column;align-items:flex-end">
+        <button class="btn btn-sm btn-primary" onclick="openDispatchAdminEdit('${a.id}','${safeName2}',${!!isSuper})">수정</button>
         <button class="btn btn-sm btn-danger" onclick="removeDispatchAdmin('${a.id}','${safeName2}')">삭제</button>
       </div>
     </div>`;
   }).join('');
 }
+
+async function openDispatchAdminEdit(adminId, adminName, isSuper) {
+  const { data: jobs } = await sb.from('dispatch_postings').select('id, title').order('created_at', {ascending: false});
+  const { data: perms } = await sb.from('dispatch_permissions').select('dispatch_posting_id').eq('admin_id', adminId);
+  const permIds = (perms||[]).map(p => p.dispatch_posting_id);
+  showConfirm(`${adminName} 권한 수정`, '', null);
+  const jobChecks = (jobs||[]).map(j =>
+    `<label style="display:flex;align-items:center;gap:8px;padding:7px;border:0.5px solid var(--border);border-radius:var(--rxs);font-size:13px;cursor:pointer">
+      <input type="checkbox" class="daEditPerm" value="${j.id}" ${permIds.includes(j.id)?'checked':''} style="accent-color:var(--accent)"> ${j.title}
+    </label>`
+  ).join('');
+  document.getElementById('confirmSub').innerHTML = `
+    <div style="margin-top:10px">
+      <label style="display:flex;align-items:center;gap:10px;padding:8px;background:var(--surface2);border-radius:var(--rxs);cursor:pointer;margin-bottom:10px">
+        <input type="checkbox" id="daEditIsSuper" ${isSuper?'checked':''} style="accent-color:var(--accent);width:16px;height:16px"
+          onchange="document.getElementById('daEditJobsWrap').style.display=this.checked?'none':'flex'">
+        <span style="font-size:13px">슈퍼파견담당자 (모든 공고 접근)</span>
+      </label>
+      <div id="daEditJobsWrap" style="display:${isSuper?'none':'flex'};flex-direction:column;gap:6px;max-height:200px;overflow-y:auto">${jobChecks}</div>
+    </div>`;
+  document.getElementById('confirmYes').textContent = '저장';
+  document.getElementById('confirmYes').style.display = '';
+  document.getElementById('confirmNo').textContent = '취소';
+  document.getElementById('confirmNo').onclick = () => closeConfirmModal();
+  confirmCallback = async (yes) => {
+    if (!yes) return;
+    const newIsSuper = document.getElementById('daEditIsSuper').checked;
+    await sb.from('admin_profiles').update({ is_super_dispatch: newIsSuper }).eq('id', adminId);
+    await sb.from('dispatch_permissions').delete().eq('admin_id', adminId);
+    if (!newIsSuper) {
+      const newPerms = Array.from(document.querySelectorAll('.daEditPerm:checked')).map(c => c.value);
+      if (newPerms.length) await sb.from('dispatch_permissions').insert(newPerms.map(jid => ({ admin_id: adminId, dispatch_posting_id: jid })));
+    }
+    await loadDispatchAdmins();
+    showToast('✓ 권한 수정 완료');
+  };
+}
+
 
 async function removeDispatchAdmin(id, name) {
   if (!confirm('"'+name+'" 담당자를 파견직 관리에서 제거하시겠습니까?')) return;
@@ -1864,6 +2129,8 @@ async function openDispatchPermEdit(adminId, adminName) {
 
 function openDispatchAdminForm() {
   ['dAdName','dAdEmail','dAdPw','dAdDept'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('dAdIsSuper').checked = false;
+  toggleDAdPerms();
   document.getElementById('dAdErr').classList.add('hidden');
   document.getElementById('dAdPerms').innerHTML = allDispatchJobs.map(j=>'<label style="display:flex;align-items:center;gap:10px;padding:10px;border:0.5px solid var(--border);border-radius:var(--rxs);cursor:pointer;font-size:13px"><input type="checkbox" value="'+j.id+'" style="accent-color:var(--accent);width:16px;height:16px;flex-shrink:0"><span>'+j.title+'</span></label>').join('');
   document.getElementById('dispatchAdminFormModal').classList.remove('hidden');
@@ -1883,12 +2150,28 @@ async function saveDispatchAdmin() {
   const res=await new Promise((resolve)=>{const xhr=new XMLHttpRequest();xhr.open('POST','https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/create-admin');xhr.setRequestHeader('content-type','application/json');xhr.setRequestHeader('authorization','Bearer '+KEY);xhr.setRequestHeader('apikey',KEY);xhr.onload=()=>resolve({ok:xhr.status<400,json:()=>Promise.resolve(JSON.parse(xhr.responseText))});xhr.onerror=()=>resolve({ok:false,json:()=>Promise.resolve({error:'network error'})});xhr.send(JSON.stringify({email,password:pw,name,department:dept||'파견담당',role:'manager'}));});
   const result=await res.json();
   if(!res.ok){err.textContent=result.error||'추가 실패';err.classList.remove('hidden');return;}
-  const checked=Array.from(document.querySelectorAll('#dAdPerms input:checked')).map(c=>c.value);
-  if(checked.length&&result.id)await sb.from('dispatch_permissions').insert(checked.map(jid=>({admin_id:result.id,dispatch_posting_id:jid})));
+  const isSuper = document.getElementById('dAdIsSuper').checked;
+  if (!isSuper) {
+    // 일반 파견담당자: 선택한 공고에만 권한
+    const checked=Array.from(document.querySelectorAll('#dAdPerms input:checked')).map(c=>c.value);
+    if(checked.length&&result.id)await sb.from('dispatch_permissions').insert(checked.map(jid=>({admin_id:result.id,dispatch_posting_id:jid})));
+  }
+  // isSuper이면 dispatch_permissions에 아무것도 안 넣음 → loadDispatchAdmins에서 전체 공고 보이게
+  if (result.id) {
+    // admin_profiles에 is_super_dispatch 플래그 저장
+    await sb.from('admin_profiles').update({ is_super_dispatch: isSuper }).eq('id', result.id);
+  }
   closeDispatchAdminForm();
   await loadDispatchAdmins();
   showToast('✓ 파견 담당자 추가 완료');
 }
+// 슈퍼파견담당자 체크박스 토글
+function toggleDAdPerms() {
+  const isSuper = document.getElementById('dAdIsSuper').checked;
+  const wrap = document.getElementById('dAdPermsWrap');
+  if (wrap) wrap.style.display = isSuper ? 'none' : '';
+}
+
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 </script>
 </body>
