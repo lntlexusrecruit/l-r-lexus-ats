@@ -151,10 +151,11 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .info-item .val{font-size:13px;font-weight:500}
 .full-width{grid-column:1/-1}
 .exp-card{border:0.5px solid var(--border);border-radius:var(--rsm);padding:12px;margin-bottom:8px}
-.exp-title{font-size:13px;font-weight:600}
-.exp-sub{font-size:12px;color:var(--text2);margin-top:1px}
-.exp-period{font-size:11px;color:var(--text3);margin-top:3px}
-.exp-desc{font-size:13px;color:var(--text2);margin-top:6px;line-height:1.65}
+.exp-title{font-size:13px;font-weight:600;color:#1a1a1a}
+.exp-sub{font-size:12px;color:#333;margin-top:2px}
+.exp-period{font-size:12px;color:#222;margin-top:4px;font-weight:500}
+.exp-salary{font-size:12px;color:#1a1a1a;font-weight:600;margin-top:2px}
+.exp-desc{font-size:13px;color:#333;margin-top:6px;line-height:1.65}
 .essay-card{border:0.5px solid var(--border);border-radius:var(--rsm);padding:14px;margin-bottom:10px}
 .essay-q{font-size:12px;font-weight:600;color:var(--p800);margin-bottom:6px}
 .essay-a{font-size:13px;color:var(--text2);line-height:1.7}
@@ -976,18 +977,15 @@ async function loadApplications() {
   if (error) { showToast('불러오기 실패: ' + error.message); return; }
   allApps = data || [];
   // 면접관 승인 캐시 로드 (파이프라인 카드 배지용)
-  const [{ data: ivApprovals }, { data: ivList }] = await Promise.all([
+  const [{ data: ivApprovals }, { data: iv2Approvals }] = await Promise.all([
     sb.from('interview_approvals').select('application_id, admin_id, admin_profiles(name)'),
-    sb.from('job_interviewers').select('job_id, admin_id, admin_profiles(name)')
+    sb.from('interview_approvals_2nd').select('application_id, admin_id, admin_profiles(name)')
   ]);
   window._cachedApprovals = ivApprovals || [];
-  window._cachedInterviewers = ivList || [];
-  const [{ data: iv2Approvals }, { data: iv2List }] = await Promise.all([
-    sb.from('interview_approvals_2nd').select('application_id, admin_id, admin_profiles(name)'),
-    sb.from('job_interviewers_2nd').select('job_id, admin_id, admin_profiles(name)')
-  ]);
   window._cachedApprovals2nd = iv2Approvals || [];
-  window._cachedInterviewers2nd = iv2List || [];
+  // 면접관 목록은 loadJobs와 동일 소스(_jobInterviewers1st/2nd) 사용
+  window._cachedInterviewers = window._jobInterviewers1st || [];
+  window._cachedInterviewers2nd = window._jobInterviewers2nd || [];
   updateStats();
   renderPipeline();
 }
@@ -1015,9 +1013,9 @@ async function loadDashboard() {
   const c = document.getElementById('dashboardContent');
   c.innerHTML = '<div class="loading"><div class="spinner"></div>불러오는 중...</div>';
 
-  // 면접관 승인 현황 전체 로드
+  // 면접관 승인 현황 — _jobInterviewers1st(loadJobs와 동일 소스) 사용
   const { data: allApprovals } = await sb.from('interview_approvals').select('application_id, admin_id, admin_profiles(name)');
-  const { data: allInterviewers } = await sb.from('job_interviewers').select('job_id, admin_id, admin_profiles(name)');
+  const allInterviewers = window._jobInterviewers1st || [];
 
   const myId = currentAdmin.id;
   const jobs = allJobs.filter(j => j.is_active);
@@ -1111,7 +1109,7 @@ function renderPipeline() {
   const apps = getFilteredApps();
   // 면접관 승인 캐시 (renderPipeline은 동기함수라 캐시 사용)
   const approvals = window._cachedApprovals || [];
-  const interviewers = window._cachedInterviewers || [];
+  const interviewers = window._jobInterviewers1st || window._cachedInterviewers || [];
   wrap.innerHTML = PIPELINE.map(stage => {
     const stageApps = apps.filter(a => (a.stage || '지원완료') === stage.key);
     return `
@@ -1436,8 +1434,53 @@ async function openModal(id) {
   const links=[['GitHub',app.link_github],['LinkedIn',app.link_linkedin],['블로그',app.link_blog],['포트폴리오',app.link_portfolio]].filter(([,v])=>v);
   document.getElementById('mLinks').innerHTML=links.map(([l,v])=>`<div class="info-item"><div class="label">${l}</div><div class="val"><a href="${v}" target="_blank" style="color:var(--b600)">${v}</a></div></div>`).join('')||'<div style="font-size:13px;color:var(--text3)">없음</div>';
   const [{data:edus},{data:careers}]=await Promise.all([sb.from('education').select('*').eq('application_id',id).order('sort_order'),sb.from('work_experience').select('*').eq('application_id',id).order('sort_order')]);
-  document.getElementById('mEdu').innerHTML=(edus||[]).length?(edus||[]).map(e=>`<div class="exp-card"><div class="exp-title">${e.school}</div><div class="exp-sub">${e.major||''} ${e.degree?'· '+e.degree:''}</div><div class="exp-period">${e.start_month||''} ~ ${e.end_month||''} · ${e.status||''} ${e.gpa?'· 학점 '+e.gpa:''}</div></div>`).join(''):'<div style="font-size:13px;color:var(--text3)">없음</div>';
-  document.getElementById('mWork').innerHTML=(careers||[]).length?(careers||[]).map(c=>c.is_no_experience?'<div class="exp-card"><div class="exp-title">신입 / 경력 없음</div></div>':`<div class="exp-card"><div class="exp-title">${c.company||'-'}</div><div class="exp-sub">${c.department||''} ${c.position?'· '+c.position:''} ${c.employment_type?'· '+c.employment_type:''}</div><div class="exp-period">${c.start_month||''} ~ ${c.is_current?'현재':c.end_month||''} ${c.final_salary?'· 최종연봉 '+c.final_salary.toLocaleString()+'만원':''}</div>${c.description?`<div class="exp-desc">${c.description}</div>`:''}</div>`).join(''):'<div style="font-size:13px;color:var(--text3)">없음</div>';
+  document.getElementById('mEdu').innerHTML=(edus||[]).length?(edus||[]).map(e=>`
+    <div class="exp-card">
+      <div class="exp-title">${e.school}</div>
+      <div class="exp-sub">${[e.major, e.degree].filter(Boolean).join(' · ')}</div>
+      <div class="exp-period">📅 ${e.start_month||''} ~ ${e.end_month||''}${e.status?' · '+e.status:''}</div>
+      ${e.gpa ? `<div class="exp-salary">📊 학점 ${e.gpa}</div>` : ''}
+    </div>`).join(''):'<div style="font-size:13px;color:var(--text3)">없음</div>';
+  // 총 경력 계산
+  const calcTotalCareer = (careers) => {
+    let totalMonths = 0;
+    (careers||[]).filter(c => !c.is_no_experience && c.start_month).forEach(c => {
+      const parseYM = s => { if (!s) return null; const [y,m] = s.split('-').map(Number); return y*12 + (m||1); };
+      const start = parseYM(c.start_month);
+      const end = c.is_current ? (new Date().getFullYear()*12 + new Date().getMonth()+1) : parseYM(c.end_month);
+      if (start && end && end > start) totalMonths += end - start;
+    });
+    if (!totalMonths) return '';
+    const y = Math.floor(totalMonths/12), m = totalMonths%12;
+    return y > 0 && m > 0 ? `${y}년 ${m}개월` : y > 0 ? `${y}년` : `${m}개월`;
+  };
+  const totalCareer = calcTotalCareer(careers);
+  const careerSectionTitle = document.querySelector('#tabCareer .section-title:last-of-type') ||
+    [...document.querySelectorAll('#tabCareer .section-title')].find(el => el.textContent === '경력');
+  if (careerSectionTitle && totalCareer) {
+    careerSectionTitle.innerHTML = `경력 <span style="font-size:12px;font-weight:500;color:#3C3489;background:#EEEDFE;padding:2px 8px;border-radius:20px;margin-left:6px">총 ${totalCareer}</span>`;
+  }
+  // 경력 카드 렌더링
+  const renderCareerPeriod = (c) => {
+    const start = c.start_month || '';
+    const end = c.is_current ? '현재' : (c.end_month || '');
+    const parseYM = s => { if (!s || s==='현재') return null; const [y,m] = s.split('-').map(Number); return y*12+(m||1); };
+    const s = parseYM(start), e = c.is_current ? (new Date().getFullYear()*12+new Date().getMonth()+1) : parseYM(end);
+    let duration = '';
+    if (s && e && e > s) { const d=e-s; const y=Math.floor(d/12),m=d%12; duration = y>0&&m>0?` (${y}년 ${m}개월)`:y>0?` (${y}년)`:` (${m}개월)`; }
+    return `${start} ~ ${end}${duration}`;
+  };
+  document.getElementById('mWork').innerHTML=(careers||[]).length?(careers||[]).map(c=>
+    c.is_no_experience
+      ? '<div class="exp-card"><div class="exp-title">신입 / 경력 없음</div></div>'
+      : `<div class="exp-card">
+          <div class="exp-title">${c.company||'-'}</div>
+          <div class="exp-sub">${[c.department, c.position, c.employment_type].filter(Boolean).join(' · ')}</div>
+          <div class="exp-period">📅 ${renderCareerPeriod(c)}</div>
+          ${c.final_salary ? `<div class="exp-salary">💰 최종연봉 ${c.final_salary.toLocaleString()}만원</div>` : ''}
+          ${c.description ? `<div class="exp-desc">${c.description}</div>` : ''}
+        </div>`
+  ).join(''):'<div style="font-size:13px;color:var(--text3)">없음</div>';
   const [{data:certs},{data:awards},{data:langs}]=await Promise.all([sb.from('certifications').select('*').eq('application_id',id),sb.from('awards').select('*').eq('application_id',id),sb.from('language_skills').select('*').eq('application_id',id)]);
   document.getElementById('mCerts').innerHTML=(certs||[]).length?(certs||[]).map(c=>`<div class="exp-card"><div class="exp-title">${c.name}</div><div class="exp-sub">${c.issuer||''}</div><div class="exp-period">${c.acquired_month||''}</div></div>`).join(''):'<div style="font-size:13px;color:var(--text3)">없음</div>';
   document.getElementById('mAwards').innerHTML=(awards||[]).length?(awards||[]).map(a=>`<div class="exp-card"><div class="exp-title">${a.name}</div><div class="exp-sub">${a.organization||''} ${a.category?'· '+a.category:''}</div><div class="exp-period">${a.period||''}</div></div>`).join(''):'<div style="font-size:13px;color:var(--text3)">없음</div>';
