@@ -3247,13 +3247,40 @@ function buildOverlapSection(allInterviewers) {
         const iv = allInterviewers.find(i => i.admin_id === aid);
         return iv?.admin_profiles?.name || '-';
       });
-      // 시간 범위 표시
-      const timeRanges = avails.map(a => `${formatSlotTime(a.slot_time)}${a.slot_time_end?' ~ '+formatSlotTime(a.slot_time_end):''}`);
+      // 겹치는 시간대 계산 (교집합)
+      const getMinutes = t => { if (!t) return null; const [h,m] = t.split(':').map(Number); return h*60+m; };
+      const toTimeStr = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+      // 각 면접관별 가능 시간범위
+      const adminRanges = {};
+      avails.forEach(a => {
+        if (!adminRanges[a.admin_id]) adminRanges[a.admin_id] = [];
+        adminRanges[a.admin_id].push({
+          start: getMinutes(a.slot_time) || 0,
+          end: getMinutes(a.slot_time_end) || (getMinutes(a.slot_time)||0) + 60
+        });
+      });
+      // 전체 교집합 구하기
+      const ranges = Object.values(adminRanges);
+      let overlap = ranges[0] || [];
+      for (let i = 1; i < ranges.length; i++) {
+        const newOverlap = [];
+        overlap.forEach(r1 => {
+          ranges[i].forEach(r2 => {
+            const start = Math.max(r1.start, r2.start);
+            const end = Math.min(r1.end, r2.end);
+            if (start < end) newOverlap.push({ start, end });
+          });
+        });
+        overlap = newOverlap;
+      }
+      const overlapStr = overlap.length
+        ? overlap.map(r => `${formatSlotTime(toTimeStr(r.start))} ~ ${formatSlotTime(toTimeStr(r.end))}`).join(', ')
+        : '겹치는 시간 없음';
       const alreadyAdded = _schedSlots.some(s => s.slot_date === date);
       return `<div style="border:1.5px solid #F5CFA0;background:#FEF3E2;border-radius:var(--rsm);padding:10px;margin-bottom:6px">
         <div style="font-size:13px;font-weight:600;color:#1a1a1a;margin-bottom:4px">${formatSlotDate(date)}</div>
-        <div style="font-size:11px;color:#7A3D00;margin-bottom:6px">${names.join(', ')} 가능</div>
-        <div style="font-size:11px;color:#444;margin-bottom:6px">${[...new Set(timeRanges)].join(' / ')}</div>
+        <div style="font-size:11px;color:#7A3D00;margin-bottom:4px">${names.join(', ')} 가능</div>
+        <div style="font-size:12px;font-weight:600;color:#534AB7;margin-bottom:6px">🔗 겹치는 시간: ${overlapStr}</div>
         ${alreadyAdded
           ? `<div style="font-size:11px;color:#3B6D11;font-weight:600">✓ 슬롯 추가됨</div>`
           : `<button class="btn btn-sm" style="font-size:11px;width:100%" onclick="quickAddSlot('${date}')">이 날짜로 슬롯 추가</button>`}
@@ -3327,10 +3354,27 @@ async function addSlots() { await addSlotsByDate(); }
 // 겹치는 날짜 빠른 추가
 async function quickAddSlot(date) {
   const col = _schedIsDispatch ? 'dispatch_candidate_id' : 'application_id';
-  // 해당 날짜 면접관 가능시간 중 가장 빠른 시작 시간 자동 적용
   const dayAvails = _schedAvailability.filter(a => a.slot_date === date);
-  const timeStart = dayAvails.reduce((min, a) => a.slot_time < min ? a.slot_time : min, '23:59');
-  const timeEnd = dayAvails.reduce((max, a) => (a.slot_time_end||a.slot_time) > max ? (a.slot_time_end||a.slot_time) : max, '00:00');
+  // 교집합 시간 계산
+  const getMin = t => { if (!t) return null; const [h,m] = t.split(':').map(Number); return h*60+m; };
+  const toStr = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  const adminRanges = {};
+  dayAvails.forEach(a => {
+    if (!adminRanges[a.admin_id]) adminRanges[a.admin_id] = [];
+    adminRanges[a.admin_id].push({ start: getMin(a.slot_time)||0, end: getMin(a.slot_time_end)||(getMin(a.slot_time)||0)+60 });
+  });
+  const ranges = Object.values(adminRanges);
+  let overlap = ranges[0] || [];
+  for (let i = 1; i < ranges.length; i++) {
+    const newO = [];
+    overlap.forEach(r1 => ranges[i].forEach(r2 => {
+      const s = Math.max(r1.start, r2.start), e = Math.min(r1.end, r2.end);
+      if (s < e) newO.push({ start: s, end: e });
+    }));
+    overlap = newO;
+  }
+  const timeStart = overlap.length ? toStr(overlap[0].start) : dayAvails[0]?.slot_time || '09:00';
+  const timeEnd = overlap.length ? toStr(overlap[0].end) : null;
   const { error } = await sb.from('interview_slots').insert({
     [col]: _schedAppId, interview_round: _schedRound,
     slot_date: date, slot_time: timeStart, slot_time_end: timeEnd,

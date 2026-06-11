@@ -99,7 +99,23 @@ async function init() {
   if (!slots?.length) { showError('아직 확정된 면접 일정이 없습니다.\n담당자에게 문의해주세요.\n📞 02-2188-3565'); return; }
 
   const name = sel.applications?.name || sel.dispatch_candidates?.name || '지원자';
-  showSlots(name, slots);
+  // 슬롯을 1시간 단위 타임슬롯으로 쪼개기
+  const expandedSlots = [];
+  slots.forEach(s => {
+    if (!s.slot_time_end) {
+      expandedSlots.push(s);
+      return;
+    }
+    const getMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+    const toStr = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+    const start = getMin(s.slot_time);
+    const end = getMin(s.slot_time_end);
+    // 면접 시간 1시간 기준, 마지막 시작 시간 = end - 60
+    for (let t = start; t <= end - 60; t += 60) {
+      expandedSlots.push({ ...s, slot_time: toStr(t), _display_end: toStr(t + 60) });
+    }
+  });
+  showSlots(name, expandedSlots);
 }
 
 function showSlots(name, slots) {
@@ -127,7 +143,7 @@ function showSlots(name, slots) {
           <div class="slot-inner">
             <div style="flex:1">
               <div class="slot-date">${formatDate(s.slot_date)}</div>
-              <div class="slot-time">${formatTime(s.slot_time)}</div>
+              <div class="slot-time">${formatTime(s.slot_time)}${s._display_end ? ' ~ ' + formatTime(s._display_end) : ''}</div>
               ${s.slot_location ? `<div class="slot-location">📍 ${s.slot_location}</div>` : ''}
             </div>
             <span class="slot-check">✓</span>
