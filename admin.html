@@ -2990,22 +2990,32 @@ async function renderInterviewSession(app) {
 
   // 이력서 데이터 로드 (application_id 기반)
   const appId2 = _ivSessionAppId;
+  const safe = async (q) => { try { return await q; } catch(e) { return { data: null }; } };
   const [
     { data: edus }, { data: careers }, { data: certs },
-    { data: awards }, { data: langs }, { data: myEval }
+    { data: awards }, { data: langs }, { data: myEval }, { data: notes }
   ] = await Promise.all([
-    sb.from('education').select('*').eq('application_id', appId2).order('start_month', {ascending:false}),
-    sb.from('work_experience').select('*').eq('application_id', appId2).order('start_month', {ascending:false}),
-    sb.from('certifications').select('*').eq('application_id', appId2),
-    sb.from('awards').select('*').eq('application_id', appId2),
-    sb.from('language_skills').select('*').eq('application_id', appId2),
-    sb.from('interview_evaluations').select('*')
+    safe(sb.from('education').select('*').eq('application_id', appId2).order('start_month', {ascending:false})),
+    safe(sb.from('work_experience').select('*').eq('application_id', appId2).order('start_month', {ascending:false})),
+    safe(sb.from('certifications').select('*').eq('application_id', appId2)),
+    safe(sb.from('awards').select('*').eq('application_id', appId2)),
+    safe(sb.from('language_skills').select('*').eq('application_id', appId2)),
+    safe(sb.from('interview_evaluations').select('*')
       .eq(_ivSessionIsDispatch ? 'dispatch_candidate_id' : 'application_id', _ivSessionAppId)
       .eq('interview_round', _ivSessionRound)
       .eq('admin_id', currentAdmin.id)
-      .maybeSingle(),
-    sb.from('admin_notes').select('*').eq('application_id', appId2).order('created_at', {ascending:false})
+      .maybeSingle()),
+    safe(sb.from('admin_notes').select('*').eq('application_id', appId2).order('created_at', {ascending:false}))
   ]);
+
+  // 메모 HTML 미리 생성
+  const memoHtml = (notes||[]).length ? `<div style="min-width:180px;max-width:220px;background:#FFFBE6;border:1px solid #FFE58F;border-radius:var(--rxs);padding:10px;flex-shrink:0;overflow-y:auto;max-height:150px">
+    <div style="font-size:10px;font-weight:700;color:#876800;margin-bottom:5px">📌 관리자 메모 (${(notes||[]).length})</div>
+    ${(notes||[]).map(n=>`<div style="font-size:12px;color:#333;line-height:1.5;margin-bottom:6px;padding-bottom:6px;border-bottom:0.5px solid #FFE58F">
+      <div style="font-size:10px;color:#876800;margin-bottom:2px">${n.author_name||'-'}</div>
+      <div style="white-space:pre-wrap">${n.content||''}</div>
+    </div>`).join('')}
+  </div>` : '';
 
   // 합격/불합격 버튼
   const passBtn = `<button class="iv-pass-btn" style="background:#EAF3DE;color:#27500A" onclick="ivDecision('pass')">✅ 합격</button>`;
@@ -3063,13 +3073,7 @@ async function renderInterviewSession(app) {
             <div style="font-size:12px;color:#666">${app.birth_date||''} ${app.gender?'· '+app.gender:''} ${app.nationality?'· '+app.nationality:''}</div>
             ${app.address?`<div style="font-size:12px;color:#666;margin-top:2px">📍 ${app.address}</div>`:''}
           </div>
-          ${(notes||[]).length ? `<div style="min-width:180px;max-width:220px;background:#FFFBE6;border:1px solid #FFE58F;border-radius:var(--rxs);padding:10px;flex-shrink:0;overflow-y:auto;max-height:150px">
-            <div style="font-size:10px;font-weight:700;color:#876800;margin-bottom:5px">📌 관리자 메모 (${(notes||[]).length})</div>
-            ${(notes||[]).map(n=>`<div style="font-size:12px;color:#333;line-height:1.5;margin-bottom:6px;padding-bottom:6px;border-bottom:0.5px solid #FFE58F">
-              <div style="font-size:10px;color:#876800;margin-bottom:2px">${n.author_name||'-'}</div>
-              <div style="white-space:pre-wrap">${n.content||''}</div>
-            </div>`).join('')}
-          </div>` : ''}
+          ${memoHtml}
         </div>
 
         <!-- 지원정보 + 개인정보 -->
