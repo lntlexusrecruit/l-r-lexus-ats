@@ -1079,14 +1079,7 @@ async function deleteJob(id, title) {
 
 // ── 지원자 목록 ──────────────────────────────────────────
 async function loadApplications() {
-  let query = sb.from('applications').select(`
-    *, job_postings(title, department),
-    photo_url, skills, link_portfolio, portfolio_file_url, resume_file_url,
-    veterans_status, veterans_number,
-    disability_status, disability_type, disability_grade, disability_number,
-    military_status, military_branch, military_rank, military_period, military_exemption,
-    hobby, specialty
-  `).eq('is_draft', false).order('submitted_at', { ascending: false });
+  let query = sb.from('applications').select('*, job_postings(title, department)').eq('is_draft', false).order('submitted_at', { ascending: false });
   if (adminProfile?.role !== 'superadmin') {
     if (!allJobs.length) { allApps = []; renderPipeline(); updateStats(); return; }
     query = query.in('job_posting_id', allJobs.map(j => j.id));
