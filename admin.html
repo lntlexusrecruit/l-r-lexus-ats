@@ -1201,7 +1201,7 @@ async function loadDashboard() {
       <span class="job-dash-status" style="background:#EAF3DE;color:#27500A">모집중</span>
       <div class="job-dash-card-title">${j.title}</div>
       <div class="job-dash-card-dept">${j.department||''} ${j.location?'· '+j.location:''}</div>
-      <div class="job-dash-card-stats">
+      <div class="job-dash-card-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;width:100%">
         <div class="job-dash-stat" style="background:#F1EFE8">
           <div class="job-dash-stat-val" style="color:#5F5E5A">${newApps}</div>
           <div class="job-dash-stat-label">신규지원</div>
@@ -1331,6 +1331,12 @@ async function passApplicant() {
   if (!app) return;
   const stage = app.stage || '지원완료';
   const role = adminProfile?.role;
+
+  // 불합격 지원자 합격 처리는 슈퍼어드민만
+  if (stage === '불합격' && role !== 'superadmin') {
+    showToast('불합격 지원자 합격 처리는 슈퍼어드민만 가능합니다');
+    return;
+  }
 
   if (stage === '지원완료' || stage === '서류검토' || stage === '서류합격') {
     // 슈퍼어드민만 관리자검토로 이동 가능
