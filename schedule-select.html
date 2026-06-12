@@ -93,8 +93,9 @@ async function init() {
 
   const appId = sel.application_id || sel.dispatch_candidate_id;
   const col = sel.application_id ? 'application_id' : 'dispatch_candidate_id';
+  const round = sel.interview_round || 1;
   const { data: slots } = await sb.from('interview_slots')
-    .select('*').eq(col, appId).eq('is_confirmed', true).order('slot_date').order('slot_time');
+    .select('*').eq(col, appId).eq('is_confirmed', true).eq('interview_round', round).order('slot_date').order('slot_time');
 
   if (!slots?.length) { showError('아직 확정된 면접 일정이 없습니다.\n담당자에게 문의해주세요.\n📞 02-2188-3565'); return; }
 
