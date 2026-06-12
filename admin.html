@@ -6,6 +6,8 @@
 <title>엘앤티렉서스 — 채용관리</title>
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2820,6 +2822,196 @@ async function saveDispatchAdmin() {
   showToast('✓ 파견 담당자 추가 완료');
 }
 
+
+
+// ══════════════════════════════════════════════════════
+// 입사지원서 Word 다운로드
+// ══════════════════════════════════════════════════════
+async function downloadResume(appId) {
+  const app = allApps.find(a => a.id === (appId || currentAppId));
+  if (!app) { showToast('지원자 정보를 찾을 수 없습니다'); return; }
+  showToast('📄 입사지원서 생성 중...');
+
+  // 이력서 데이터 로드
+  const [{ data: edus }, { data: careers }, { data: certs }, { data: awards }, { data: langs }] = await Promise.all([
+    sb.from('education').select('*').eq('application_id', app.id).order('start_month', {ascending:false}),
+    sb.from('work_experience').select('*').eq('application_id', app.id).order('start_month', {ascending:false}),
+    sb.from('certifications').select('*').eq('application_id', app.id),
+    sb.from('awards').select('*').eq('application_id', app.id),
+    sb.from('language_skills').select('*').eq('application_id', app.id),
+  ]);
+
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+          AlignmentType, BorderStyle, WidthType, ShadingType, VerticalAlign } = docx;
+
+  const border = { style: BorderStyle.SINGLE, size: 4, color: '000000' };
+  const borders = { top: border, bottom: border, left: border, right: border };
+  const W = 9360;
+
+  const lCell = (text, w) => new TableCell({
+    borders, width: { size: w, type: WidthType.DXA },
+    shading: { fill: 'D9D9D9', type: ShadingType.CLEAR },
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 60, bottom: 60, left: 80, right: 80 },
+    children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: text||'', bold: true, size: 17, font: '맑은 고딕' })] })]
+  });
+  const dCell = (text, w, span) => new TableCell({
+    borders, width: { size: w, type: WidthType.DXA }, columnSpan: span,
+    verticalAlign: VerticalAlign.CENTER,
+    margins: { top: 60, bottom: 60, left: 80, right: 80 },
+    children: [new Paragraph({ children: [new TextRun({ text: text||'', size: 18, font: '맑은 고딕' })] })]
+  });
+  const hRow = (text) => new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [W], rows: [
+    new TableRow({ children: [new TableCell({ borders, width: { size: W, type: WidthType.DXA },
+      shading: { fill: 'D9D9D9', type: ShadingType.CLEAR }, margins: { top: 60, bottom: 60, left: 80, right: 80 },
+      children: [new Paragraph({ children: [new TextRun({ text, bold: true, size: 20, font: '맑은 고딕' })] })]
+    })] })
+  ]});
+
+  const jobType = app.work_type || '신입';
+  const gender = app.gender || '';
+  const military = app.military_status || '';
+  const veterans = app.veterans_status || '비해당';
+  const disability = app.disability_status || '비해당';
+
+  // 경력 행 (최대 4개)
+  const careerRows = [0,1,2,3].map(i => {
+    const c = careers?.[i] || {};
+    const period = c.start_month && (c.end_month || c.is_current) ? `${c.start_month} ~ ${c.is_current?'현재':c.end_month}` : '';
+    return new TableRow({ children: [
+      dCell(period, 2200), dCell(c.company||'', 2500),
+      dCell(c.department||'', 1200), dCell(c.position||'', 1000), dCell(c.description||'', 2460),
+    ]});
+  });
+
+  const careerDetailTables = (careers||[]).slice(0,4).map(c => new Table({
+    width: { size: W, type: WidthType.DXA },
+    columnWidths: [1300, 2000, 1500, 2000, 2560],
+    rows: [
+      new TableRow({ children: [
+        lCell('기간', 1300), dCell(`${c.start_month||''} ~ ${c.is_current?'현재':c.end_month||''}`, 2000),
+        lCell('연봉(세전)', 1500), dCell(`${c.final_salary?c.final_salary+'만원':''}`, 2000), dCell('', 2560),
+      ]}),
+      new TableRow({ children: [
+        lCell('회사명', 1300), dCell(c.company||'', 2000), lCell('직위', 1500), dCell(c.position||'', 4560, 2),
+      ]}),
+      new TableRow({ children: [
+        lCell('주요업무', 1300), dCell(c.description||'', 8060, 4),
+      ]}),
+    ]
+  }));
+
+  const essayItems = [
+    ['1. 성장과정 및 학창시절', app.essay_experience],
+    ['2. 생활신조 및 본인의 장단점', app.essay_strength],
+    ['3. 지원동기', app.essay_motivation],
+    ['4. 입사 후 포부', app.essay_goal],
+  ];
+
+  const document = new Document({
+    styles: { default: { document: { run: { font: '맑은 고딕', size: 18 } } } },
+    sections: [{
+      properties: { page: { size: { width: 12240, height: 15840 }, margin: { top: 720, right: 720, bottom: 720, left: 720 } } },
+      children: [
+        // 제목
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 0, after: 120 }, children: [
+          new TextRun({ text: 'L&T LEXUS 입 사 지 원 서', bold: true, size: 32, font: '맑은 고딕' })
+        ]}),
+
+        // 기본사항
+        hRow('기본사항'),
+        new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [1200, 2200, 1200, 4760], rows: [
+          new TableRow({ children: [lCell('채용구분',1200), dCell(jobType,2200), lCell('지원지점',1200), dCell(app.job_postings?.title||'',4760)] }),
+          new TableRow({ children: [lCell('지원분야',1200), dCell(app.job_postings?.department||'',7160,3)] }),
+          new TableRow({ children: [lCell('출근가능일',1200), dCell(app.available_start_date||'',2200), lCell('희망연봉',1200), dCell(`${app.desired_salary?app.desired_salary+'만원':''}`,4760)] }),
+        ]}),
+
+        // 증명사진 + 기본정보
+        new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [1400, 1200, 2000, 1200, 3560], rows: [
+          new TableRow({ height: { value: 500, rule: 'atLeast' }, children: [
+            new TableCell({ borders, rowSpan: 5, width: { size: 1400, type: WidthType.DXA }, verticalAlign: VerticalAlign.CENTER, margins: { top: 60, bottom: 60, left: 80, right: 80 },
+              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '증명사진', size: 16, font: '맑은 고딕' })] })]
+            }),
+            lCell('성명(한글)',1200), dCell(app.name||'',2000), lCell('국  적',1200), dCell(app.nationality||'',3560),
+          ]}),
+          new TableRow({ children: [lCell('성명(영문)',1200), dCell(app.name_en||'',2000), lCell('성  별',1200), dCell(gender,3560)] }),
+          new TableRow({ children: [lCell('생년월일',1200), dCell(app.birth_date||'',2000), lCell('나  이',1200), dCell(app.birth_date?`만 ${new Date().getFullYear()-new Date(app.birth_date).getFullYear()}세`:'',3560)] }),
+          new TableRow({ children: [lCell('주  소',1200), dCell(app.address||'',7160,3)] }),
+          new TableRow({ children: [lCell('휴대폰',1200), dCell(app.phone||'',2000), lCell('E-mail',1200), dCell(app.email||'',3560)] }),
+        ]}),
+
+        // 보훈/병역
+        new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [1200, 1200, 4160, 2800], rows: [
+          new TableRow({ children: [
+            new TableCell({ borders, rowSpan: 4, width: { size: 1200, type: WidthType.DXA }, shading: { fill: 'D9D9D9', type: ShadingType.CLEAR }, verticalAlign: VerticalAlign.CENTER, margins: { top: 60, bottom: 60, left: 80, right: 80 },
+              children: [new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: '보훈/병역외', bold: true, size: 17, font: '맑은 고딕' })] })]
+            }),
+            lCell('보훈여부',1200), dCell(veterans === '해당' ? `해당 (보훈번호: ${app.veterans_number||''})` : '해당없음', 4160), dCell('',2800),
+          ]}),
+          new TableRow({ children: [
+            lCell('장애여부',1200), dCell(disability === '해당' ? `해당 / 종별: ${app.disability_type||''} / 정도: ${app.disability_grade||''} / 등록번호: ${app.disability_number||''}` : '해당없음', 7160, 2),
+          ]}),
+          new TableRow({ children: [
+            lCell('군필여부',1200), dCell(military ? `${military}${app.military_branch?' / 군별: '+app.military_branch:''}${app.military_rank?' / 계급: '+app.military_rank:''}${app.military_period?' / 복무: '+app.military_period:''}${app.military_exemption?' / 면제사유: '+app.military_exemption:''}` : '', 7160, 2),
+          ]}),
+          new TableRow({ children: [lCell('특기',1200), dCell(app.specialty||'',2000), lCell('취미',1200), dCell(app.hobby||'',3560)] }),
+        ]}),
+
+        // 학력
+        hRow('학력사항'),
+        new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [1100, 700, 700, 2200, 1600, 800, 800, 1460], rows: [
+          new TableRow({ children: [lCell('구분',1100), lCell('시작',700), lCell('종료',700), lCell('학교명',2200), lCell('전공',1600), lCell('학점',800), lCell('졸업여부',800), lCell('소재지',1460)] }),
+          ...(['전문대학','대학교','대학원(석사)','대학원(박사)'].map(type => {
+            const e = (edus||[]).find(x => x.degree?.includes(type.replace('교','').replace('(석사)','').replace('(박사)','')) || x.degree === type) || {};
+            return new TableRow({ children: [
+              lCell(type,1100), dCell(e.start_month||'',700), dCell(e.end_month||'',700),
+              dCell(e.school||'',2200), dCell(e.major||'',1600), dCell(e.gpa||'',800), dCell(e.status||'',800), dCell('',1460),
+            ]});
+          })),
+        ]}),
+
+        // 어학/자격
+        hRow('어학 및 자격사항'),
+        new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [700, 1300, 1200, 900, 100, 700, 1200, 800, 1200, 1260], rows: [
+          new TableRow({ children: [lCell('어학종류',700), lCell('자격시험',1300), lCell('점수',1200), lCell('응시일자',900), dCell('',100), lCell('자격종류',700), lCell('자격명',1200), lCell('등급',800), lCell('발급기관',1200), lCell('취득일',1260)] }),
+          ...[0,1,2,3].map(i => {
+            const l = (langs||[])[i] || {};
+            const c = (certs||[])[i] || {};
+            return new TableRow({ children: [
+              dCell(l.language||'',700), dCell(l.test_name||'',1300), dCell(l.score||'',1200), dCell(l.acquired_date||'',900), dCell('',100),
+              dCell(c.category||'',700), dCell(c.name||'',1200), dCell(c.grade||'',800), dCell(c.issuer||'',1200), dCell(c.acquired_date||'',1260),
+            ]});
+          }),
+        ]}),
+
+        // 경력
+        hRow('경력사항'),
+        new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [2200, 2500, 1200, 1000, 2460], rows: [
+          new TableRow({ children: [lCell('기간',2200), lCell('회사명',2500), lCell('부서',1200), lCell('직위',1000), lCell('직무',2460)] }),
+          ...careerRows,
+        ]}),
+        ...careerDetailTables,
+
+        // 자기소개
+        hRow('자기소개'),
+        ...essayItems.map(([q, a]) => new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [W], rows: [
+          new TableRow({ children: [new TableCell({ borders, shading: { fill: 'EFEFEF', type: ShadingType.CLEAR }, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ children: [new TextRun({ text: q, bold: true, size: 18, font: '맑은 고딕' })] })] })] }),
+          new TableRow({ height: { value: 1500, rule: 'atLeast' }, children: [new TableCell({ borders, margins: { top: 60, bottom: 60, left: 80, right: 80 }, children: [new Paragraph({ children: [new TextRun({ text: a||'', size: 18, font: '맑은 고딕' })] })] })] }),
+        ]})),
+
+        // 서명
+        new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: '입사지원서 상의 모든 사항은 사실과 다름없음을 확인합니다.', size: 18, font: '맑은 고딕' })] }),
+        new Table({ width: { size: W, type: WidthType.DXA }, columnWidths: [1500, 5860, 2000], rows: [
+          new TableRow({ children: [lCell('작성일',1500), dCell(new Date().toLocaleDateString('ko-KR'),5860), dCell('작성자:                  (서명)',2000)] })
+        ]}),
+      ]
+    }]
+  });
+
+  const blob = await Packer.toBlob(document);
+  saveAs(blob, `입사지원서_${app.name}_${new Date().toLocaleDateString('ko-KR').replace(/\./g,'').replace(/ /g,'')}.docx`);
+  showToast('✅ 입사지원서 다운로드 완료');
+}
 
 // ══════════════════════════════════════════════════════
 // 면접 채팅 (Realtime)
