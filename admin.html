@@ -1930,10 +1930,32 @@ function toggleSelectAll(cb) {
   document.querySelectorAll('.cand-check').forEach(c => c.checked = cb.checked);
 }
 
+// Storage 파일 삭제 헬퍼
+async function deleteAppStorageFiles(app) {
+  try {
+    const toDelete = [];
+    if (app?.photo_url) {
+      // URL에서 파일 경로 추출
+      const match = app.photo_url.match(/applicant-files\/(.+)$/);
+      if (match) toDelete.push(match[1]);
+    }
+    if (app?.portfolio_file_url) {
+      const match = app.portfolio_file_url.match(/applicant-files\/(.+)$/);
+      if (match) toDelete.push(match[1]);
+    }
+    if (toDelete.length) {
+      await sb.storage.from('applicant-files').remove(toDelete);
+    }
+  } catch(e) { console.log('Storage 파일 삭제 실패:', e); }
+}
+
 async function deleteSingle(id, name) {
   if (!confirm(`"${name}" 지원자의 데이터를 삭제하시겠습니까?
 이 작업은 되돌릴 수 없습니다.`)) return;
   showLoading('삭제 중...');
+  // Storage 파일 먼저 삭제
+  const app = allApps.find(a => a.id === id);
+  await deleteAppStorageFiles(app);
   await sb.from('education').delete().eq('application_id', id);
   await sb.from('work_experience').delete().eq('application_id', id);
   await sb.from('certifications').delete().eq('application_id', id);
@@ -1955,6 +1977,9 @@ async function deleteSelected() {
   if (!confirm(`선택한 ${checked.length}명의 지원자 데이터를 삭제하시겠습니까?`)) return;
   showLoading('삭제 중...');
   for (const id of checked) {
+    // Storage 파일 삭제
+    const app = allApps.find(a => a.id === id);
+    await deleteAppStorageFiles(app);
     await sb.from('education').delete().eq('application_id', id);
     await sb.from('work_experience').delete().eq('application_id', id);
     await sb.from('certifications').delete().eq('application_id', id);
