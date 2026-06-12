@@ -40,7 +40,12 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 
 /* 레이아웃 */
 .app{display:flex;min-height:100vh}
-.sidebar{width:220px;background:var(--surface);border-right:0.5px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10}
+.sidebar{width:220px;background:var(--surface);border-right:0.5px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:10;transition:width .25s,transform .25s}
+.sidebar.collapsed{width:0;overflow:hidden;transform:translateX(-220px)}
+.sb-toggle-btn{position:fixed;left:220px;top:50%;transform:translateY(-50%);z-index:11;background:var(--accent);color:#fff;border:none;border-radius:0 6px 6px 0;padding:8px 5px;cursor:pointer;font-size:12px;transition:left .25s;line-height:1}
+.sb-toggle-btn.collapsed{left:0}
+.app-wrap{margin-left:220px;transition:margin-left .25s}
+.app-wrap.expanded{margin-left:0}
 .sb-logo{padding:16px 20px;border-bottom:0.5px solid var(--border);font-family:'DM Serif Display',serif;font-size:15px;color:var(--text)}
 .sb-nav{flex:1;padding:12px 0;overflow-y:auto}
 .sb-label{font-size:10px;font-weight:500;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;padding:8px 20px 4px}
@@ -54,7 +59,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .role-badge{font-size:10px;padding:2px 8px;border-radius:20px;margin-top:2px;display:inline-block}
 .role-super{background:#FAEEDA;color:#633806}.role-agency{background:#FEF3C7;color:#92400E}
 .role-manager{background:var(--p50);color:var(--p800)}
-.main{margin-left:220px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.main{margin-left:220px;transition:margin-left .25s;flex:1;display:flex;flex-direction:column;min-height:100vh}
 
 /* 탑바 */
 .topbar{background:var(--surface);border-bottom:0.5px solid var(--border);padding:0 28px;height:52px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
@@ -104,7 +109,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .iv-room-job{font-size:12px;color:#666;margin-top:2px}
 .iv-room-status{margin-left:auto;font-size:12px;padding:4px 12px;border-radius:20px;font-weight:600;white-space:nowrap}
 /* 면접 세션 */
-.iv-session-grid{display:grid;grid-template-columns:1fr 400px;gap:20px;height:calc(100vh - 120px)}
+.iv-session-grid{display:grid;grid-template-columns:1fr 320px 320px;gap:16px;height:calc(100vh - 140px)}
 .iv-resume-panel{overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;font-size:15px}
 .iv-resume-panel .exp-card{font-size:15px}
 .iv-resume-panel .exp-title{font-size:16px}
@@ -112,6 +117,21 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .iv-resume-panel .exp-period{font-size:14px}
 .iv-resume-panel .exp-salary{font-size:14px}
 .iv-eval-panel{display:flex;flex-direction:column;gap:12px;overflow-y:auto}
+/* 채팅 패널 */
+.iv-chat-panel{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.iv-chat-header{padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;background:var(--surface2)}
+.iv-chat-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.iv-chat-msg{max-width:85%;padding:8px 12px;border-radius:12px;font-size:13px;line-height:1.5}
+.iv-chat-msg.mine{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.iv-chat-msg.others{align-self:flex-start;background:var(--surface2);color:#1a1a1a;border-bottom-left-radius:4px}
+.iv-chat-msg-name{font-size:10px;opacity:0.7;margin-bottom:3px}
+.iv-chat-msg-time{font-size:10px;opacity:0.6;margin-top:3px;text-align:right}
+.iv-chat-input-wrap{padding:10px;border-top:1px solid var(--border);display:flex;gap:8px}
+.iv-chat-input{flex:1;padding:8px 12px;border:0.5px solid var(--border);border-radius:20px;font-size:13px;font-family:'Pretendard',sans-serif;outline:none}
+.iv-chat-input:focus{border-color:var(--accent)}
+/* 사이드바 토글 */
+.sb-toggle-btn{position:fixed;left:0;top:50%;transform:translateY(-50%);z-index:200;background:var(--accent);color:#fff;border:none;border-radius:0 6px 6px 0;padding:10px 6px;cursor:pointer;font-size:14px;transition:all .2s}
+.sb-toggle-btn.hidden-state{left:0}
 .iv-pass-btn{padding:20px;font-size:18px;font-weight:700;border:none;border-radius:var(--radius);cursor:pointer;transition:all .15s;flex:1}
 .iv-pass-btn:hover{transform:scale(1.02)}
 .eval-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
@@ -297,7 +317,8 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
 <!-- 앱 -->
 <div id="viewApp" class="hidden">
   <div class="app">
-    <aside class="sidebar">
+    <button class="sb-toggle-btn" id="sbToggleBtn" onclick="toggleSidebar()">◀</button>
+    <aside class="sidebar" id="sidebar">
       <div class="sb-logo" style="font-family:'Pretendard',sans-serif;font-weight:600;font-size:14px;letter-spacing:-0.3px">엘앤티렉서스(주)</div>
       <nav class="sb-nav">
         <div class="sb-label" id="recruitMenuLabel">채용 관리</div>
@@ -332,7 +353,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
       </div>
     </aside>
 
-    <div class="main">
+    <div class="main" id="mainWrap">
       <!-- 파이프라인 -->
       <!-- 공고 대시보드 (기본 홈) -->
       <div id="pageDashboard">
@@ -2782,6 +2803,84 @@ async function saveDispatchAdmin() {
   showToast('✓ 파견 담당자 추가 완료');
 }
 
+
+// ══════════════════════════════════════════════════════
+// 면접 채팅 (Realtime)
+// ══════════════════════════════════════════════════════
+let _chatChannel = null;
+
+async function initChat(appId, isDispatch, round) {
+  // 기존 채널 정리
+  if (_chatChannel) {
+    await sb.removeChannel(_chatChannel);
+    _chatChannel = null;
+  }
+  const col = isDispatch ? 'dispatch_candidate_id' : 'application_id';
+  // 기존 메시지 로드
+  const { data: msgs } = await sb.from('interview_chats')
+    .select('*').eq(col, appId).eq('interview_round', round)
+    .order('created_at', { ascending: true });
+  renderChatMessages(msgs || []);
+
+  // Realtime 구독
+  _chatChannel = sb.channel(`chat:${appId}:${round}`)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'interview_chats',
+      filter: `${col}=eq.${appId}`
+    }, payload => {
+      appendChatMsg(payload.new);
+    })
+    .subscribe();
+}
+
+function renderChatMessages(msgs) {
+  const el = document.getElementById('ivChatMessages');
+  if (!el) return;
+  if (!msgs.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;font-size:12px;color:var(--text3)">채팅을 시작하세요</div>';
+    return;
+  }
+  el.innerHTML = msgs.map(m => buildChatBubble(m)).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function appendChatMsg(msg) {
+  const el = document.getElementById('ivChatMessages');
+  if (!el) return;
+  // "채팅을 시작하세요" 문구 제거
+  if (el.querySelector('div[style*="text-align:center"]')) el.innerHTML = '';
+  el.insertAdjacentHTML('beforeend', buildChatBubble(msg));
+  el.scrollTop = el.scrollHeight;
+}
+
+function buildChatBubble(msg) {
+  const isMe = msg.admin_id === currentAdmin.id;
+  const time = new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  return `<div style="display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'}">
+    ${!isMe ? `<div style="font-size:10px;color:var(--text3);margin-bottom:2px;padding:0 4px">${msg.admin_name||'-'}</div>` : ''}
+    <div class="iv-chat-msg ${isMe?'mine':'others'}">${msg.message.replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+      <div class="iv-chat-msg-time">${time}</div>
+    </div>
+  </div>`;
+}
+
+async function sendChatMsg() {
+  const input = document.getElementById('ivChatInput');
+  const msg = input?.value.trim();
+  if (!msg) return;
+  input.value = '';
+  const col = _ivSessionIsDispatch ? 'dispatch_candidate_id' : 'application_id';
+  await sb.from('interview_chats').insert({
+    [col]: _ivSessionAppId,
+    interview_round: _ivSessionRound,
+    admin_id: currentAdmin.id,
+    admin_name: adminProfile?.name || currentAdmin.email.split('@')[0],
+    message: msg
+  });
+}
+
 // ══════════════════════════════════════════════════════
 // 면접 진행 (Interview Room)
 // ══════════════════════════════════════════════════════
@@ -2882,6 +2981,7 @@ async function openInterviewSession(appId, isDispatch) {
   _ivSessionRound = app?.stage === '2차면접' ? 2 : 1;
   document.getElementById('ivSessionTitle').textContent = `🎤 ${app?.name||'-'} 면접 진행 중 (${_ivSessionRound}차)`;
   await renderInterviewSession(app);
+  await initChat(_ivSessionAppId, isDispatch, _ivSessionRound);
 }
 
 async function renderInterviewSession(app) {
@@ -3041,7 +3141,7 @@ async function renderInterviewSession(app) {
           </div>`).join('')}` : ''}
       </div>
 
-      <!-- 오른쪽: 평가표 -->
+      <!-- 가운데: 평가표 -->
       <div class="iv-eval-panel">
         <div class="eval-card">
           <div class="eval-title">📝 면접 평가표 (${_ivSessionRound}차)</div>
@@ -3083,6 +3183,18 @@ async function renderInterviewSession(app) {
         <div class="eval-card" id="otherEvalsCard">
           <div class="eval-title">👥 면접관 평가 현황</div>
           <div id="otherEvals" style="font-size:12px;color:var(--text3)">불러오는 중...</div>
+        </div>
+      </div>
+
+      <!-- 채팅 패널 -->
+      <div class="iv-chat-panel">
+        <div class="iv-chat-header">💬 면접관 채팅</div>
+        <div class="iv-chat-messages" id="ivChatMessages">
+          <div style="text-align:center;padding:20px;font-size:12px;color:var(--text3)">채팅을 시작하세요</div>
+        </div>
+        <div class="iv-chat-input-wrap">
+          <input class="iv-chat-input" id="ivChatInput" placeholder="메시지 입력..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){sendChatMsg();event.preventDefault()}">
+          <button class="btn btn-primary btn-sm" onclick="sendChatMsg()">전송</button>
         </div>
       </div>
     </div>`;
@@ -3643,6 +3755,28 @@ function formatSlotTime(t) {
   const [h,m] = t.split(':');
   const hour = parseInt(h);
   return `${hour < 12 ? '오전' : '오후'} ${hour <= 12 ? hour : hour-12}:${m}`;
+}
+
+// 사이드바 토글
+let _sidebarCollapsed = false;
+function toggleSidebar() {
+  _sidebarCollapsed = !_sidebarCollapsed;
+  const sb = document.getElementById('sidebar');
+  const main = document.getElementById('mainWrap');
+  const btn = document.getElementById('sbToggleBtn');
+  if (_sidebarCollapsed) {
+    sb.classList.add('collapsed');
+    main.style.marginLeft = '0';
+    btn.style.left = '0';
+    btn.textContent = '▶';
+    btn.title = '사이드바 보이기';
+  } else {
+    sb.classList.remove('collapsed');
+    main.style.marginLeft = '220px';
+    btn.style.left = '220px';
+    btn.textContent = '◀';
+    btn.title = '사이드바 숨기기';
+  }
 }
 
 function toggleEJobPerms() {
