@@ -1158,9 +1158,17 @@ async function loadDashboard() {
   const c = document.getElementById('dashboardContent');
   c.innerHTML = '<div class="loading"><div class="spinner"></div>불러오는 중...</div>';
 
-  // 면접관 승인 현황 — _jobInterviewers1st(loadJobs와 동일 소스) 사용
+  // 면접관 승인 현황 — DB에서 직접 로드 (캐시 불일치 방지)
   const { data: allApprovals } = await sb.from('interview_approvals').select('application_id, admin_id, admin_profiles(name)');
-  const allInterviewers = window._jobInterviewers1st || [];
+  // _jobInterviewers1st 없으면 직접 로드
+  let allInterviewers = window._jobInterviewers1st || [];
+  if (!allInterviewers.length && jobs.length) {
+    const { data: freshIvs } = await sb.from('job_interviewers')
+      .select('job_id, admin_id, admin_profiles(name)')
+      .in('job_id', jobs.map(j => j.id));
+    allInterviewers = freshIvs || [];
+    window._jobInterviewers1st = allInterviewers;
+  }
 
   const myId = currentAdmin.id;
   const jobs = allJobs.filter(j => j.is_active);
@@ -3366,7 +3374,7 @@ async function loadSchedulePanel() {
   const [{ data: slots }, { data: avail }, { data: selection }] = await Promise.all([
     sb.from('interview_slots').select('*, admin_profiles(name)').eq(col, _schedAppId).eq('interview_round', _schedRound).order('slot_date').order('slot_time'),
     sb.from('interviewer_availability').select('*, admin_profiles(name)').eq(col, _schedAppId).order('slot_date').order('slot_time'),
-    sb.from('interview_selections').select('*, interview_slots(*)').eq(col, _schedAppId)
+    sb.from('interview_selections').select('*, interview_slots(*)').eq(col, _schedAppId).eq('interview_round', _schedRound)
   ]);
   _schedSlots = slots || [];
   _schedAvailability = avail || [];
@@ -3739,9 +3747,9 @@ async function sendScheduleEmail() {
   // 기존 선택 레코드 있으면 업데이트, 없으면 삽입
   const { data: existing } = await sb.from('interview_selections').select('id').eq(col, _schedAppId).maybeSingle();
   if (existing) {
-    await sb.from('interview_selections').update({ token, slot_id: null, expires_at: expiresAt, selected_at: null }).eq('id', existing.id);
+    await sb.from('interview_selections').update({ token, slot_id: null, expires_at: expiresAt, selected_at: null, interview_round: _schedRound }).eq('id', existing.id);
   } else {
-    await sb.from('interview_selections').insert({ [col]: _schedAppId, token, expires_at: expiresAt });
+    await sb.from('interview_selections').insert({ [col]: _schedAppId, token, expires_at: expiresAt, interview_round: _schedRound });
   }
   const app = _schedIsDispatch
     ? (window._dispatchCands||[]).find(c => c.id === _schedAppId)
