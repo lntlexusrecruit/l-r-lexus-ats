@@ -3003,7 +3003,8 @@ async function renderInterviewSession(app) {
       .eq(_ivSessionIsDispatch ? 'dispatch_candidate_id' : 'application_id', _ivSessionAppId)
       .eq('interview_round', _ivSessionRound)
       .eq('admin_id', currentAdmin.id)
-      .maybeSingle()
+      .maybeSingle(),
+    sb.from('admin_notes').select('*').eq('application_id', appId2).order('created_at', {ascending:false})
   ]);
 
   // 합격/불합격 버튼
@@ -3062,9 +3063,12 @@ async function renderInterviewSession(app) {
             <div style="font-size:12px;color:#666">${app.birth_date||''} ${app.gender?'· '+app.gender:''} ${app.nationality?'· '+app.nationality:''}</div>
             ${app.address?`<div style="font-size:12px;color:#666;margin-top:2px">📍 ${app.address}</div>`:''}
           </div>
-          ${app.admin_memo ? `<div style="min-width:180px;max-width:220px;background:#FFFBE6;border:1px solid #FFE58F;border-radius:var(--rxs);padding:10px;flex-shrink:0">
-            <div style="font-size:10px;font-weight:700;color:#876800;margin-bottom:5px">📌 관리자 메모</div>
-            <div style="font-size:12px;color:#333;line-height:1.6;white-space:pre-wrap">${app.admin_memo}</div>
+          ${(notes||[]).length ? `<div style="min-width:180px;max-width:220px;background:#FFFBE6;border:1px solid #FFE58F;border-radius:var(--rxs);padding:10px;flex-shrink:0;overflow-y:auto;max-height:150px">
+            <div style="font-size:10px;font-weight:700;color:#876800;margin-bottom:5px">📌 관리자 메모 (${(notes||[]).length})</div>
+            ${(notes||[]).map(n=>`<div style="font-size:12px;color:#333;line-height:1.5;margin-bottom:6px;padding-bottom:6px;border-bottom:0.5px solid #FFE58F">
+              <div style="font-size:10px;color:#876800;margin-bottom:2px">${n.author_name||'-'}</div>
+              <div style="white-space:pre-wrap">${n.content||''}</div>
+            </div>`).join('')}
           </div>` : ''}
         </div>
 
@@ -3289,6 +3293,9 @@ async function ivDecision(decision) {
     } else {
       await failApplicant();
     }
+    // allApps 갱신 + 공고현황/파이프라인 연동
+    await loadApplications();
+    loadDashboard();
     // 면접 진행 목록으로 복귀
     showPage('interviewroom', null);
     await loadInterviewRoom();
