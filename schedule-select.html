@@ -100,24 +100,8 @@ async function init() {
   if (!slots?.length) { showError('아직 확정된 면접 일정이 없습니다.\n담당자에게 문의해주세요.\n📞 02-2188-3565'); return; }
 
   const name = sel.applications?.name || sel.dispatch_candidates?.name || '지원자';
-  // 슬롯을 1시간 단위 타임슬롯으로 쪼개기
-  const expandedSlots = [];
-  slots.forEach(s => {
-    if (!s.slot_time_end) {
-      expandedSlots.push({ ...s, _uid: s.id + '_0' });
-      return;
-    }
-    const getMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
-    const toStr = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
-    const start = getMin(s.slot_time);
-    const end = getMin(s.slot_time_end);
-    let idx = 0;
-    for (let t = start; t <= end - 60; t += 60) {
-      expandedSlots.push({ ...s, slot_time: toStr(t), _display_end: toStr(t + 60), _uid: s.id + '_' + idx });
-      idx++;
-    }
-  });
-  showSlots(name, expandedSlots);
+  // DB에서 이미 1시간 단위로 저장됨 - 그대로 표시
+  showSlots(name, slots);
 }
 
 function showSlots(name, slots) {
@@ -141,11 +125,11 @@ function showSlots(name, slots) {
     <div id="timerBadge" style="background:#FEF3E2;color:#7A3D00;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;text-align:center;margin-bottom:16px">⏱ 로딩 중...</div>
     <div id="slotList">
       ${slots.map(s => `
-        <div class="slot" id="slot-${s._uid||s.id}" onclick="selectSlot('${s._uid||s.id}', '${s.id}')">
+        <div class="slot" id="slot-${s.id}" onclick="selectSlot('${s.id}')">
           <div class="slot-inner">
             <div style="flex:1">
               <div class="slot-date">${formatDate(s.slot_date)}</div>
-              <div class="slot-time">${formatTime(s.slot_time)}${s._display_end ? ' ~ ' + formatTime(s._display_end) : ''}</div>
+              <div class="slot-time">${formatTime(s.slot_time)}${s.slot_time_end ? ' ~ ' + formatTime(s.slot_time_end) : ''}</div>
               ${s.slot_location ? `<div class="slot-location">📍 ${s.slot_location}</div>` : ''}
             </div>
             <span class="slot-check">✓</span>
@@ -164,10 +148,10 @@ function showSlots(name, slots) {
   setTimeout(startTimer, 100);
 }
 
-function selectSlot(uid, realId) {
+function selectSlot(id) {
   document.querySelectorAll('.slot').forEach(el => el.classList.remove('selected'));
-  document.getElementById('slot-'+uid).classList.add('selected');
-  selectedSlotId = realId || uid; // DB에 저장할 실제 slot id
+  document.getElementById('slot-'+id).classList.add('selected');
+  selectedSlotId = id;
   document.getElementById('confirmBtn').disabled = false;
 }
 

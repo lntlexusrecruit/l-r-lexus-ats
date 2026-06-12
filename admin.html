@@ -3647,16 +3647,33 @@ async function addSlotsByDate() {
   if (_schedSelectedDates.size === 0) { showToast('날짜를 선택하세요'); return; }
   const col = _schedIsDispatch ? 'dispatch_candidate_id' : 'application_id';
   const dates = [..._schedSelectedDates].sort();
-  const rows = dates.map((date, i) => {
-    const start = document.getElementById(`slotStart_${i}`)?.value || '10:00';
-    const end = document.getElementById(`slotEnd_${i}`)?.value || null;
+  const getMin = t => { const [h,m] = t.split(':').map(Number); return h*60+m; };
+  const toStr = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  const rows = [];
+  dates.forEach((date, i) => {
+    const startStr = document.getElementById(`slotStart_${i}`)?.value || '10:00';
+    const endStr = document.getElementById(`slotEnd_${i}`)?.value || null;
     const loc = document.getElementById(`slotLoc_${i}`)?.value || '';
-    return {
-      [col]: _schedAppId, interview_round: _schedRound,
-      slot_date: date, slot_time: start, slot_time_end: end||null,
-      slot_location: loc, created_by: currentAdmin.id
-    };
+    if (endStr) {
+      // 1시간 단위로 쪼개서 각각 row 생성
+      const startMin = getMin(startStr);
+      const endMin = getMin(endStr);
+      for (let t = startMin; t < endMin; t += 60) {
+        rows.push({
+          [col]: _schedAppId, interview_round: _schedRound,
+          slot_date: date, slot_time: toStr(t), slot_time_end: toStr(t+60),
+          slot_location: loc, created_by: currentAdmin.id
+        });
+      }
+    } else {
+      rows.push({
+        [col]: _schedAppId, interview_round: _schedRound,
+        slot_date: date, slot_time: startStr, slot_time_end: null,
+        slot_location: loc, created_by: currentAdmin.id
+      });
+    }
   });
+  if (!rows.length) { showToast('추가할 슬롯이 없습니다'); return; }
   const { error } = await sb.from('interview_slots').insert(rows);
   if (error) { showToast('오류: '+error.message); return; }
   _schedSelectedDates.clear();
