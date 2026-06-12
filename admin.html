@@ -1228,11 +1228,11 @@ async function loadDashboard() {
 }
 
 function renderInterviewerBadgesSummary(jobId, jobApps, interviewers, allApprovals) {
-  // 1차면접 중인 지원자가 있을 때만 면접관 승인 현황 표시
-  const interviewApps = jobApps.filter(a => a.stage === '1차면접');
+  // 1차 또는 2차면접 중인 지원자
+  const interviewApps = jobApps.filter(a => ['1차면접','2차면접'].includes(a.stage));
   if (!interviewApps.length) return '';
 
-  // 면접관별 승인 완료 수
+  // 면접관별 승인 완료 수 (1차/2차 구분 없이 전체 합산)
   const summary = interviewers.map(iv => {
     const approvedCount = interviewApps.filter(a => {
       return allApprovals.some(ap => ap.application_id === a.id && ap.admin_id === iv.admin_id);
