@@ -1418,10 +1418,12 @@ async function handleInterviewApproval(appId, app) {
     // 내 승인 추가
     await sb.from('interview_approvals').insert({ application_id: appId, admin_id: myId });
     approvedIds.push(myId);
-    // 캐시 갱신
-    window._cachedApprovals = [...(window._cachedApprovals||[]), { application_id: appId, admin_id: myId, admin_profiles: { name: adminProfile?.name } }];
+    // DB에서 최신 승인 데이터 다시 로드 (캐시 완전 동기화)
+    const { data: freshApprovals } = await sb.from('interview_approvals')
+      .select('application_id, admin_id, admin_profiles(name)');
+    window._cachedApprovals = freshApprovals || [];
     renderPipeline();
-    loadDashboard(); // 공고현황 면접관 배지도 갱신
+    await loadDashboard();
   }
 
   const total = interviewers.length;
@@ -3300,9 +3302,9 @@ async function ivDecision(decision) {
     } else {
       await failApplicant();
     }
-    // allApps 갱신 + 승인 캐시 갱신 + 공고현황/파이프라인 연동
-    await loadApplications(); // 이 안에서 _cachedApprovals도 갱신됨
-    loadDashboard();
+    // allApps + 승인캐시 갱신 후 대시보드/파이프라인 연동
+    await loadApplications();
+    await loadDashboard(); // loadApplications 완료 후 호출해야 캐시 반영됨
     // 면접 진행 목록으로 복귀
     showPage('interviewroom', null);
     await loadInterviewRoom();
