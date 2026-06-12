@@ -1421,6 +1421,7 @@ async function handleInterviewApproval(appId, app) {
     // 캐시 갱신
     window._cachedApprovals = [...(window._cachedApprovals||[]), { application_id: appId, admin_id: myId, admin_profiles: { name: adminProfile?.name } }];
     renderPipeline();
+    loadDashboard(); // 공고현황 면접관 배지도 갱신
   }
 
   const total = interviewers.length;
@@ -2974,6 +2975,8 @@ let _ivSessionAppId = null, _ivSessionIsDispatch = false, _ivSessionRound = 1;
 async function openInterviewSession(appId, isDispatch) {
   _ivSessionAppId = appId;
   _ivSessionIsDispatch = isDispatch;
+  // passApplicant/failApplicant가 currentAppId를 사용하므로 동기화
+  if (!isDispatch) currentAppId = appId;
   showPage('interviewsession', null);
   const app = isDispatch
     ? (window._dispatchCands||[]).find(c => c.id === appId)
@@ -3297,8 +3300,8 @@ async function ivDecision(decision) {
     } else {
       await failApplicant();
     }
-    // allApps 갱신 + 공고현황/파이프라인 연동
-    await loadApplications();
+    // allApps 갱신 + 승인 캐시 갱신 + 공고현황/파이프라인 연동
+    await loadApplications(); // 이 안에서 _cachedApprovals도 갱신됨
     loadDashboard();
     // 면접 진행 목록으로 복귀
     showPage('interviewroom', null);
