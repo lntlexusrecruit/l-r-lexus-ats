@@ -947,8 +947,8 @@ async function loadJobs() {
   const jobIds = allJobs.map(j => j.id);
   if (jobIds.length) {
     const [{ data: iv1 }, { data: iv2 }] = await Promise.all([
-      sb.from('job_interviewers').select('job_id, admin_profiles(name)').in('job_id', jobIds),
-      sb.from('job_interviewers_2nd').select('job_id, admin_profiles(name)').in('job_id', jobIds)
+      sb.from('job_interviewers').select('job_id, admin_id, admin_profiles(name)').in('job_id', jobIds),
+      sb.from('job_interviewers_2nd').select('job_id, admin_id, admin_profiles(name)').in('job_id', jobIds)
     ]);
     window._jobInterviewers1st = iv1 || [];
     window._jobInterviewers2nd = iv2 || [];
