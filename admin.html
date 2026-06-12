@@ -1109,12 +1109,15 @@ async function loadApplications() {
 function updateStats() {
   // 제출 완료된 지원자만 (임시저장 제외)
   const submitted = allApps.filter(a => !a.is_draft);
-  document.getElementById('sbTotal').textContent = submitted.length;
-  document.getElementById('st1').textContent = submitted.length;
+  // 현재 선택된 공고 필터 적용
+  const jobFilter = document.getElementById('jobFilter')?.value;
+  const filtered = jobFilter ? submitted.filter(a => a.job_posting_id === jobFilter) : submitted;
   const wa = new Date(Date.now()-7*24*60*60*1000).toISOString();
-  document.getElementById('st2').textContent = submitted.filter(a=>a.submitted_at>wa).length;
-  document.getElementById('st3').textContent = submitted.filter(a=>['1차면접','2차면접'].includes(a.stage)).length;
-  document.getElementById('st4').textContent = submitted.filter(a=>a.stage==='최종합격').length;
+  document.getElementById('sbTotal').textContent = submitted.length; // 사이드바는 전체
+  document.getElementById('st1').textContent = filtered.length;
+  document.getElementById('st2').textContent = filtered.filter(a=>a.submitted_at>wa).length;
+  document.getElementById('st3').textContent = filtered.filter(a=>['1차면접','2차면접'].includes(a.stage)).length;
+  document.getElementById('st4').textContent = filtered.filter(a=>a.stage==='최종합격').length;
   // 면접 진행 사이드바 배지
   const sbIv = document.getElementById('sbInterview');
   if (sbIv) sbIv.textContent = submitted.filter(a=>['1차면접','2차면접'].includes(a.stage)).length || '';
@@ -1290,6 +1293,7 @@ function renderPipeline() {
       </div>
     `;
   }).join('');
+  updateStats();
 }
 
 // ── 합격/불합격 처리 ─────────────────────────────────────
