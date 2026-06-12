@@ -629,7 +629,7 @@ function buildPayload(isDraft) {
     available_start_date: fd.basic.startDate||null,
     work_type: fd.basic.workType||null,
     apply_source: fd.basic.source||[],
-    skills: skills,
+    skills: fd.basic.skills?.length ? fd.basic.skills : skills,
     essay_motivation: fd.essay.q1||null,   // 성장과정
     essay_experience: fd.essay.q3||null,  // 지원동기
     essay_strength: fd.essay.q2||null,    // 성격장단점
@@ -730,7 +730,17 @@ function buildStep(step) {
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-function nextStep(){collectStep();if(currentStep<STEPS.length-1){currentStep++;buildStep(currentStep);}else{submitApplication();}}
+function nextStep(){
+  // 스킬 input에 값 있으면 자동 추가
+  const skillInput = document.getElementById('skillInput');
+  if (skillInput?.value.trim()) {
+    const v = skillInput.value.trim();
+    if (!skills.includes(v)) skills.push(v);
+    skillInput.value = '';
+  }
+  collectStep();
+  if(currentStep<STEPS.length-1){currentStep++;buildStep(currentStep);}else{submitApplication();}
+}
 function prevStep(){collectStep();if(currentStep>0){currentStep--;buildStep(currentStep);}}
 
 // ── Step 0: 기본정보 ─────────────────────────────────────
@@ -780,7 +790,7 @@ function buildBasic(){
       <label class="field-label">보유 스킬</label>
       <div class="tag-input-wrap" id="skillWrap" onclick="document.getElementById('skillInput').focus()">
         ${skills.map(s=>`<span class="skill-chip" data-s="${s}">${s}<span class="skill-chip-remove" onclick="rmSkill('${s}')">×</span></span>`).join('')}
-        <input class="tag-input-field" id="skillInput" placeholder="스킬 입력 후 Enter" onkeydown="addSkill(event)">
+        <input class="tag-input-field" id="skillInput" placeholder="스킬 입력 (Enter 또는 쉼표로 구분)" onkeydown="addSkill(event)" onblur="addSkillOnBlur()" oninput="addSkillOnComma(event)">
       </div>
       <div class="field-hint">예: React, TypeScript, Node.js …</div>
     </div>
@@ -941,6 +951,8 @@ function updCnt(k,lim,v){document.getElementById('cnt_'+k).textContent=v.length+
 
 // ── 데이터 수집 ──────────────────────────────────────────
 function collectAllSteps(){
+  // 스킬 수집 (전역변수에서)
+  fd.basic.skills = [...skills];
   // 학력 데이터 수집
   document.querySelectorAll('[data-ei]').forEach(el=>{
     const i=el.dataset.ei,k=el.dataset.k;
@@ -997,6 +1009,12 @@ function collectStep(){
     fd.basic.photoUrl = _photoUrl; // 사진 URL 복원
     const wt=document.querySelector('input[name="wt"]:checked');if(wt)fd.basic.workType=wt.value;
     fd.basic.source=Array.from(document.querySelectorAll('.check-group input:checked')).map(c=>c.value);
+    // skillInput에 입력 중인 값도 포함
+    const _si = document.getElementById('skillInput');
+    if (_si?.value.trim() && !skills.includes(_si.value.trim())) {
+      skills.push(_si.value.trim());
+      _si.value = '';
+    }
     fd.basic.skills=[...skills];
     // 새 필드
     fd.basic.veterans = document.querySelector('input[name="veterans"]:checked')?.value||'비해당';
@@ -1079,7 +1097,42 @@ function onMilitaryChange(val) {
     if (el) el.style.display = val === v ? 'block' : 'none';
   });
 }
-function addSkill(e){if(e.key!=='Enter')return;const input=document.getElementById('skillInput');const v=input.value.trim();if(!v||skills.includes(v))return;skills.push(v);const chip=document.createElement('span');chip.className='skill-chip';chip.dataset.s=v;chip.innerHTML=`${v}<span class="skill-chip-remove" onclick="rmSkill('${v}')">×</span>`;document.getElementById('skillWrap').insertBefore(chip,input);input.value='';e.preventDefault();}
+function _addSkillValue(v) {
+  v = v.trim().replace(/,$/, '').trim();
+  if (!v || skills.includes(v)) return;
+  skills.push(v);
+  const input = document.getElementById('skillInput');
+  const chip = document.createElement('span');
+  chip.className = 'skill-chip';
+  chip.dataset.s = v;
+  chip.innerHTML = `${v}<span class="skill-chip-remove" onclick="rmSkill('${v}')">×</span>`;
+  const wrap = document.getElementById('skillWrap');
+  if (wrap && input) wrap.insertBefore(chip, input);
+  else if (wrap) wrap.appendChild(chip);
+}
+function addSkill(e) {
+  if (e.key !== 'Enter' && e.key !== ',') return;
+  const input = document.getElementById('skillInput');
+  _addSkillValue(input.value);
+  input.value = '';
+  e.preventDefault();
+}
+function addSkillOnBlur() {
+  const input = document.getElementById('skillInput');
+  if (input?.value.trim()) {
+    // 쉼표로 여러 개 입력한 경우 분리
+    input.value.split(',').forEach(v => _addSkillValue(v));
+    input.value = '';
+  }
+}
+function addSkillOnComma(e) {
+  const input = document.getElementById('skillInput');
+  if (input?.value.includes(',')) {
+    const parts = input.value.split(',');
+    parts.slice(0, -1).forEach(v => _addSkillValue(v));
+    input.value = parts[parts.length - 1];
+  }
+}
 function rmSkill(v){skills=skills.filter(s=>s!==v);document.querySelectorAll(`.skill-chip[data-s="${v}"]`).forEach(c=>c.remove());}
 async function previewPhoto(input){
   if(!input.files[0])return;
