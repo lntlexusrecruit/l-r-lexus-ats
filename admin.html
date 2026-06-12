@@ -105,7 +105,12 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .iv-room-status{margin-left:auto;font-size:12px;padding:4px 12px;border-radius:20px;font-weight:600;white-space:nowrap}
 /* 면접 세션 */
 .iv-session-grid{display:grid;grid-template-columns:1fr 400px;gap:20px;height:calc(100vh - 120px)}
-.iv-resume-panel{overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.iv-resume-panel{overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;font-size:15px}
+.iv-resume-panel .exp-card{font-size:15px}
+.iv-resume-panel .exp-title{font-size:16px}
+.iv-resume-panel .exp-sub{font-size:14px}
+.iv-resume-panel .exp-period{font-size:14px}
+.iv-resume-panel .exp-salary{font-size:14px}
 .iv-eval-panel{display:flex;flex-direction:column;gap:12px;overflow-y:auto}
 .iv-pass-btn{padding:20px;font-size:18px;font-weight:700;border:none;border-radius:var(--radius);cursor:pointer;transition:all .15s;flex:1}
 .iv-pass-btn:hover{transform:scale(1.02)}
@@ -2901,8 +2906,8 @@ async function renderInterviewSession(app) {
   const totalCareerIv = calcTotalCareerIv(careers);
 
   const photoHtml = app.photo_url
-    ? `<img src="${app.photo_url}" style="width:160px;height:200px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0">`
-    : `<div style="width:160px;height:200px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:40px;color:var(--text3);flex-shrink:0">👤</div>`;
+    ? `<img src="${app.photo_url}" style="width:80px;height:100px;object-fit:cover;border-radius:6px;border:1px solid var(--border);flex-shrink:0">`
+    : `<div style="width:80px;height:100px;background:var(--surface2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--text3);flex-shrink:0">👤</div>`;
 
   c.innerHTML = `
     <div style="display:flex;gap:8px;margin-bottom:16px">

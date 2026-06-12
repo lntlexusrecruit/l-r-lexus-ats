@@ -992,7 +992,9 @@ function collectAllSteps(){
 
 function collectStep(){
   if(currentStep===0){
+    const _photoUrl = fd.basic.photoUrl; // 사진 URL 보존
     fd.basic={name:g('f_name'),nameEn:g('f_nameEn'),birth:g('f_birth'),gender:g('f_gender'),nation:g('f_nation'),email:g('f_email'),phone:g('f_phone'),addr:g('f_addr'),salary:g('f_salary'),startDate:g('f_startDate')};
+    fd.basic.photoUrl = _photoUrl; // 사진 URL 복원
     const wt=document.querySelector('input[name="wt"]:checked');if(wt)fd.basic.workType=wt.value;
     fd.basic.source=Array.from(document.querySelectorAll('.check-group input:checked')).map(c=>c.value);
     fd.basic.skills=[...skills];
