@@ -1107,12 +1107,17 @@ async function loadApplications() {
 }
 
 function updateStats() {
-  document.getElementById('sbTotal').textContent = allApps.length;
-  document.getElementById('st1').textContent = allApps.length;
+  // 제출 완료된 지원자만 (임시저장 제외)
+  const submitted = allApps.filter(a => !a.is_draft);
+  document.getElementById('sbTotal').textContent = submitted.length;
+  document.getElementById('st1').textContent = submitted.length;
   const wa = new Date(Date.now()-7*24*60*60*1000).toISOString();
-  document.getElementById('st2').textContent = allApps.filter(a=>a.submitted_at>wa).length;
-  document.getElementById('st3').textContent = allApps.filter(a=>['1차면접','2차면접'].includes(a.stage)).length;
-  document.getElementById('st4').textContent = allApps.filter(a=>a.stage==='최종합격').length;
+  document.getElementById('st2').textContent = submitted.filter(a=>a.submitted_at>wa).length;
+  document.getElementById('st3').textContent = submitted.filter(a=>['1차면접','2차면접'].includes(a.stage)).length;
+  document.getElementById('st4').textContent = submitted.filter(a=>a.stage==='최종합격').length;
+  // 면접 진행 사이드바 배지
+  const sbIv = document.getElementById('sbInterview');
+  if (sbIv) sbIv.textContent = submitted.filter(a=>['1차면접','2차면접'].includes(a.stage)).length || '';
 }
 
 function getFilteredApps() {
@@ -1968,6 +1973,7 @@ async function deleteSingle(id, name) {
   updateStats();
   renderPipeline();
   renderCandidates();
+  loadDashboard();
   showToast('✓ 삭제 완료');
 }
 
@@ -1993,6 +1999,7 @@ async function deleteSelected() {
   updateStats();
   renderPipeline();
   renderCandidates();
+  loadDashboard();
   showToast(`✓ ${checked.length}명 삭제 완료`);
 }
 
