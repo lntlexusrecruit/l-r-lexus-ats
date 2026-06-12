@@ -3688,9 +3688,9 @@ async function addSlots() { await addSlotsByDate(); }
 async function quickAddSlot(date) {
   const col = _schedIsDispatch ? 'dispatch_candidate_id' : 'application_id';
   const dayAvails = _schedAvailability.filter(a => a.slot_date === date);
-  // 교집합 시간 계산
   const getMin = t => { if (!t) return null; const [h,m] = t.split(':').map(Number); return h*60+m; };
   const toStr = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  // 교집합 시간 계산
   const adminRanges = {};
   dayAvails.forEach(a => {
     if (!adminRanges[a.admin_id]) adminRanges[a.admin_id] = [];
@@ -3706,15 +3706,29 @@ async function quickAddSlot(date) {
     }));
     overlap = newO;
   }
-  const timeStart = overlap.length ? toStr(overlap[0].start) : dayAvails[0]?.slot_time || '09:00';
-  const timeEnd = overlap.length ? toStr(overlap[0].end) : null;
-  const { error } = await sb.from('interview_slots').insert({
-    [col]: _schedAppId, interview_round: _schedRound,
-    slot_date: date, slot_time: timeStart, slot_time_end: timeEnd,
-    created_by: currentAdmin.id
-  });
+  // 1시간 단위로 쪼개서 각각 insert
+  const rows = [];
+  if (overlap.length) {
+    overlap.forEach(r => {
+      for (let t = r.start; t < r.end; t += 60) {
+        rows.push({
+          [col]: _schedAppId, interview_round: _schedRound,
+          slot_date: date, slot_time: toStr(t), slot_time_end: toStr(t+60),
+          created_by: currentAdmin.id
+        });
+      }
+    });
+  } else {
+    // 교집합 없으면 단일 슬롯
+    rows.push({
+      [col]: _schedAppId, interview_round: _schedRound,
+      slot_date: date, slot_time: dayAvails[0]?.slot_time || '09:00',
+      slot_time_end: null, created_by: currentAdmin.id
+    });
+  }
+  const { error } = await sb.from('interview_slots').insert(rows);
   if (error) { showToast('오류: '+error.message); return; }
-  showToast('✓ 슬롯 추가됨');
+  showToast(`✓ ${rows.length}개 슬롯 추가됨`);
   await loadSchedulePanel();
 }
 
