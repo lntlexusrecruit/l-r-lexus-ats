@@ -1158,6 +1158,9 @@ async function loadDashboard() {
   const c = document.getElementById('dashboardContent');
   c.innerHTML = '<div class="loading"><div class="spinner"></div>불러오는 중...</div>';
 
+  const myId = currentAdmin.id;
+  const jobs = allJobs.filter(j => j.is_active);
+
   // 면접관 승인 현황 — DB에서 직접 로드 (캐시 불일치 방지)
   const { data: allApprovals } = await sb.from('interview_approvals').select('application_id, admin_id, admin_profiles(name)');
   // _jobInterviewers1st 없으면 직접 로드
@@ -1169,9 +1172,6 @@ async function loadDashboard() {
     allInterviewers = freshIvs || [];
     window._jobInterviewers1st = allInterviewers;
   }
-
-  const myId = currentAdmin.id;
-  const jobs = allJobs.filter(j => j.is_active);
 
   if (!jobs.length) {
     c.innerHTML = '<div class="empty-state"><div class="icon">📋</div><p>진행 중인 공고가 없습니다</p></div>';
