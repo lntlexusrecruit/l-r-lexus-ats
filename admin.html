@@ -1636,7 +1636,7 @@ async function openModal(id) {
   document.getElementById('mBasicInfo').innerHTML=[
     ['생년월일', (app.birth_date||'-') + (app.birth_date ? ' ('+calcAge(app.birth_date)+')' : '')],
     ['성별',app.gender||'-'],['국적',app.nationality||'-'],
-    ['휴대폰',app.phone||'-'],['주소',app.address||'-',true],
+    ['영문명',app.name_en||'-'],['휴대폰',app.phone||'-'],['주소',app.address||'-',true],
     ['특기',app.specialty||'-'],['취미',app.hobby||'-'],
     ['보훈여부', app.veterans_status==='해당' ? `해당 (${app.veterans_number||'번호없음'})` : '비해당'],
     ['장애여부', app.disability_status==='해당' ? `해당 · ${app.disability_type||'-'} · ${app.disability_grade||'-'} (${app.disability_number||'번호없음'})` : '비해당'],
@@ -1707,7 +1707,13 @@ async function openModal(id) {
   document.getElementById('mCerts').innerHTML=(certs||[]).length?(certs||[]).map(c=>`<div class="exp-card"><div class="exp-title">${c.name}</div><div class="exp-sub">${c.issuer||''}</div><div class="exp-period">${c.acquired_month||''}</div></div>`).join(''):'<div style="font-size:13px;color:var(--text3)">없음</div>';
   document.getElementById('mAwards').innerHTML=(awards||[]).length?(awards||[]).map(a=>`<div class="exp-card"><div class="exp-title">${a.name}</div><div class="exp-sub">${a.organization||''} ${a.category?'· '+a.category:''}</div><div class="exp-period">${a.period||''}</div></div>`).join(''):'<div style="font-size:13px;color:var(--text3)">없음</div>';
   document.getElementById('mLangs').innerHTML=(langs||[]).length?(langs||[]).map(l=>`<div class="exp-card"><div class="exp-title">${l.language}</div><div class="exp-sub">${l.test_name||''} ${l.score?'· '+l.score:''}</div><div class="exp-period">${l.conversation_level||''} ${l.acquired_month?'· '+l.acquired_month:''}</div></div>`).join(''):'<div style="font-size:13px;color:var(--text3)">없음</div>';
-  const qs=[['성장과정',app.essay_motivation],['성격의 장단점',app.essay_strength],['지원동기',app.essay_experience],['입사 후 목표 및 포부',app.essay_goal]];
+  const qs=[
+    ['성장과정', app.essay_growth||app.essay_motivation],
+    ['성격의 장단점', app.essay_strength],
+    ['성취/실패 경험', app.essay_achievement||app.essay_experience],
+    ['노력과 계획', app.essay_effort||app.essay_goal],
+    ['지원동기/포부', app.essay_motivation],
+  ].filter(([,v])=>v);
   document.getElementById('mEssays').innerHTML=qs.filter(([,v])=>v).map(([q,a])=>`<div class="essay-card"><div class="essay-q">${q}</div><div class="essay-a">${a}</div></div>`).join('')||'<div style="font-size:13px;color:var(--text3)">없음</div>';
   await loadNotes(id);
   switchTab('Info');
@@ -2856,21 +2862,40 @@ async function downloadResume(appId) {
     const birth = app.birth_date ? new Date(app.birth_date) : null;
     const age = birth ? (today.getFullYear() - birth.getFullYear()) : '';
 
-    // 학력 데이터
-    const eduTypes = ['전문대학', '대학교', '대학원(석사)', '대학원(박사)'];
+    // 학력 데이터 (degree 기준으로 매칭)
+    const degreeMap = [
+      {n:1, keys:['전문대', '2년', '3년', '전문']},
+      {n:2, keys:['대학교', '학사', '4년']},
+      {n:3, keys:['석사', '대학원']},
+      {n:4, keys:['박사']},
+    ];
     const eduData = {};
-    eduTypes.forEach((type, i) => {
+    // 먼저 전체 학력을 순서대로 배치 (최대 4개)
+    const eduList = (edus||[]).slice(0, 4);
+    // degree로 매핑 시도, 안되면 순서대로
+    const mappedEdus = [null, null, null, null];
+    eduList.forEach(e => {
+      const deg = (e.degree||'').toLowerCase();
+      if (deg.includes('박사')) mappedEdus[3] = e;
+      else if (deg.includes('석사') || deg.includes('대학원')) mappedEdus[2] = e;
+      else if (deg.includes('전문')) mappedEdus[0] = e;
+      else mappedEdus[1] = e; // 대학교
+    });
+    // 매핑 안된 경우 순서대로 채우기
+    if (mappedEdus.every(x=>!x)) eduList.forEach((e,i) => { mappedEdus[i] = e; });
+
+    for (let i = 0; i < 4; i++) {
       const n = i + 1;
-      const e = (edus||[]).find(x => x.degree?.includes(type.replace('(석사)','').replace('(박사)','').replace('교','')) || x.degree === type) || {};
+      const e = mappedEdus[i] || {};
       eduData[`학력${n}학교`] = e.school || '';
       eduData[`학력${n}전공`] = e.major || '';
       eduData[`학력${n}시작`] = e.start_month || '';
       eduData[`학력${n}종료`] = e.end_month || '';
       eduData[`학력${n}학점`] = e.gpa || '';
       eduData[`학력${n}졸업`] = e.status || '';
-    });
+    }
 
-    // 어학 데이터 (최대 4개)
+    // 어학 데이터 (최대 4개) - acquired_month 컬럼 사용
     const langData = {};
     for (let i = 0; i < 4; i++) {
       const n = i + 1;
@@ -2878,18 +2903,18 @@ async function downloadResume(appId) {
       langData[`어학${n}종류`] = l.language || '';
       langData[`어학${n}시험`] = l.test_name || '';
       langData[`어학${n}점수`] = l.score || '';
-      langData[`어학${n}날짜`] = l.acquired_date || '';
+      langData[`어학${n}날짜`] = l.acquired_month || l.acquired_date || '';
     }
 
-    // 자격증 데이터 (최대 4개)
+    // 자격증 데이터 (최대 4개) - name, issuer, acquired_month 컬럼 사용
     const certData = {};
     for (let i = 0; i < 4; i++) {
       const n = i + 1;
       const c = (certs||[])[i] || {};
-      certData[`자격${n}종류`] = c.category || '';
-      certData[`자격${n}등급`] = c.grade || '';
+      certData[`자격${n}종류`] = c.name || '';        // name 컬럼
+      certData[`자격${n}등급`] = c.grade || '';        // grade (없을 수 있음)
       certData[`자격${n}발급기관`] = c.issuer || '';
-      certData[`자격${n}취득일`] = c.acquired_date || '';
+      certData[`자격${n}취득일`] = c.acquired_month || c.acquired_date || '';
     }
 
     // 경력 총기간 계산 함수
@@ -2915,10 +2940,10 @@ async function downloadResume(appId) {
       careerData[`경력${n}회사`] = c.company || '';
       careerData[`경력${n}부서`] = c.department || '';
       careerData[`경력${n}직위`] = c.position || '';
-      careerData[`경력${n}직무`] = c.job_description || c.description || '';
+      careerData[`경력${n}직무`] = '';           // 빈칸 (직무는 수행내역에만)
       careerData[`경력${n}연봉`] = c.final_salary || '';
-      careerData[`경력${n}주요업무`] = c.description || '';
-      careerData[`경력${n}수행내역`] = c.achievement || c.description || '';
+      careerData[`경력${n}주요업무`] = '';        // 빈칸
+      careerData[`경력${n}수행내역`] = c.description || c.achievement || '';
       careerData[`경력${n}이직사유`] = c.reason_for_leaving || '';
     }
 
@@ -3342,9 +3367,15 @@ async function renderInterviewSession(app) {
         </div>`).join('')}` : ''}
 
         <!-- 자기소개서 -->
-        ${app.essay_motivation||app.essay_experience||app.essay_strength||app.essay_goal ? `
+        ${app.essay_growth||app.essay_strength||app.essay_achievement||app.essay_effort||app.essay_motivation ? `
         <div style="font-size:13px;font-weight:700;margin-bottom:8px;margin-top:14px;color:#534AB7">자기소개서</div>
-        ${[['성장과정',app.essay_experience],['성격의 장단점',app.essay_strength],['지원동기',app.essay_motivation],['입사 후 목표',app.essay_goal]].filter(([,v])=>v).map(([q,a])=>`
+        ${[
+          ['성장과정', app.essay_growth||app.essay_motivation],
+          ['성격의 장단점', app.essay_strength],
+          ['성취/실패 경험', app.essay_achievement||app.essay_experience],
+          ['노력과 계획', app.essay_effort||app.essay_goal],
+          ['지원동기/포부', app.essay_motivation],
+        ].filter(([,v])=>v).map(([q,a])=>`
           <div class="exp-card" style="margin-bottom:10px">
             <div style="font-size:12px;font-weight:600;color:#534AB7;margin-bottom:6px">${q}</div>
             <div style="font-size:13px;color:#333;line-height:1.7;white-space:pre-wrap">${a}</div>
