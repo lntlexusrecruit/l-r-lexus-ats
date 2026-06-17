@@ -6,6 +6,7 @@
 <title>엘앤티렉서스 — 채용관리</title>
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./emailjs.min.js"></script>
 <script src="./pizzip.js"></script>
 <script src="./docxtemplater.js"></script>
 <script>
@@ -1356,17 +1357,11 @@ async function passApplicant() {
     await updateStageById(currentAppId, '관리자검토');
     showToast('✓ 관리자 검토 단계로 이동했습니다');
     updateModalStage('관리자검토');
-    // 배정된 관리자들에게 이메일 알림 발송
-    try {
-      const notifyApp = allApps.find(a => a.id === currentAppId);
-      if (notifyApp) {
-        fetch('https://hslykriyfmnhbwzcocjs.supabase.co/functions/v1/notify-new-applicant', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhzbHlrcml5Zm1uaGJ3emNvY2pzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc5ODIzMDQsImV4cCI6MjA5MzU1ODMwNH0.Ez5r-NSkQDvUmYjowHjMHeP_5BeqPxg59DxTrcKgKss' },
-          body: JSON.stringify({ application_id: currentAppId, stage: '관리자검토', applicant_name: notifyApp.name })
-        });
-      }
-    } catch(e) { /* 이메일 실패해도 진행 */ }
+    // 배정된 관리자/면접관들에게 EmailJS 알림 발송
+    const notifyApp = allApps.find(a => a.id === currentAppId);
+    if (notifyApp) {
+      notifyReviewRequired(notifyApp.job_posting_id, notifyApp.name, notifyApp.job_postings?.title);
+    }
 
   } else if (stage === '관리자검토') {
     // 이 공고에 배정된 manager만 1차면접으로 이동 가능
@@ -2839,6 +2834,63 @@ async function saveDispatchAdmin() {
 }
 
 
+
+
+// ══════════════════════════════════════════════════════
+// EmailJS 알림 발송
+// ══════════════════════════════════════════════════════
+const EMAILJS_PUBLIC_KEY = '64df6f1LLxOFIWkIQ';
+const EMAILJS_SERVICE_ID = 'service_lntlexusrecruit';
+const EMAILJS_TEMPLATE_REVIEW = 'template_b77545d';   // 검토 요청
+const EMAILJS_TEMPLATE_INTERVIEW = 'template_ju4wzpu'; // 면접 확정
+
+if (window.emailjs) emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+
+// 검토 요청 알림 (관리자검토 단계 이동 시)
+async function notifyReviewRequired(jobId, applicantName, jobTitle) {
+  try {
+    // 이 공고에 배정된 manager + 면접관 전체 조회
+    const [{ data: perms }, { data: ivs }] = await Promise.all([
+      sb.from('admin_job_permissions').select('admin_id, admin_profiles(name, email)').eq('job_posting_id', jobId),
+      sb.from('job_interviewers').select('admin_id, admin_profiles(name, email)').eq('job_id', jobId)
+    ]);
+    const recipients = new Map();
+    [...(perms||[]), ...(ivs||[])].forEach(p => {
+      if (p.admin_profiles?.email) recipients.set(p.admin_profiles.email, p.admin_profiles.name);
+    });
+    if (!recipients.size) return;
+
+    for (const [email, name] of recipients) {
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_REVIEW, {
+        email, to_name: name || '담당자',
+        applicant_name: applicantName, job_title: jobTitle || ''
+      });
+    }
+  } catch(e) { console.log('알림 발송 실패:', e); }
+}
+
+// 면접 확정 알림 (지원자가 시간 선택 완료 시)
+async function notifyInterviewConfirmed(jobId, applicantName, jobTitle, round, dateStr, timeStr) {
+  try {
+    const [{ data: perms }, { data: ivs }] = await Promise.all([
+      sb.from('admin_job_permissions').select('admin_id, admin_profiles(name, email)').eq('job_posting_id', jobId),
+      sb.from(round === 2 ? 'job_interviewers_2nd' : 'job_interviewers').select('admin_id, admin_profiles(name, email)').eq('job_id', jobId)
+    ]);
+    const recipients = new Map();
+    [...(perms||[]), ...(ivs||[])].forEach(p => {
+      if (p.admin_profiles?.email) recipients.set(p.admin_profiles.email, p.admin_profiles.name);
+    });
+    if (!recipients.size) return;
+
+    for (const [email, name] of recipients) {
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_INTERVIEW, {
+        email, to_name: name || '담당자',
+        applicant_name: applicantName, job_title: jobTitle || '',
+        interview_round: round, interview_date: dateStr, interview_time: timeStr
+      });
+    }
+  } catch(e) { console.log('알림 발송 실패:', e); }
+}
 
 // ══════════════════════════════════════════════════════
 // 입사지원서 Word 다운로드 (docxtemplater)

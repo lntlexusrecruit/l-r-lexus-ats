@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>면접 일정 선택 | 엘앤티렉서스(주)</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./emailjs.min.js"></script>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'Pretendard',-apple-system,sans-serif;background:#F5F4F0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
@@ -67,11 +68,12 @@ async function init() {
   if (!token) { showError('유효하지 않은 링크입니다'); return; }
 
   const { data: sel } = await sb.from('interview_selections')
-    .select('*, applications(name, email), dispatch_candidates(name)')
+    .select('*, applications(name, email, job_posting_id, job_postings(title)), dispatch_candidates(name)')
     .eq('token', token).maybeSingle();
 
   if (!sel) { showError('유효하지 않은 링크이거나 만료되었습니다'); return; }
   selectionId = sel.id;
+  window._currentSel = sel; // 알림 발송용 전역 저장
 
   // 이미 선택 완료
   if (sel.slot_id) {
@@ -155,6 +157,34 @@ function selectSlot(id) {
   document.getElementById('confirmBtn').disabled = false;
 }
 
+
+const EMAILJS_PUBLIC_KEY = '64df6f1LLxOFIWkIQ';
+const EMAILJS_SERVICE_ID = 'service_lntlexusrecruit';
+const EMAILJS_TEMPLATE_INTERVIEW = 'template_ju4wzpu';
+if (window.emailjs) emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+
+async function notifyInterviewersConfirmed(jobId, round, applicantName, jobTitle, dateStr, timeStr) {
+  try {
+    if (!jobId) return;
+    const ivTable = round === 2 ? 'job_interviewers_2nd' : 'job_interviewers';
+    const [{ data: perms }, { data: ivs }] = await Promise.all([
+      sb.from('admin_job_permissions').select('admin_profiles(name, email)').eq('job_posting_id', jobId),
+      sb.from(ivTable).select('admin_profiles(name, email)').eq('job_id', jobId)
+    ]);
+    const recipients = new Map();
+    [...(perms||[]), ...(ivs||[])].forEach(p => {
+      if (p.admin_profiles?.email) recipients.set(p.admin_profiles.email, p.admin_profiles.name);
+    });
+    for (const [email, name] of recipients) {
+      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_INTERVIEW, {
+        email, to_name: name || '담당자',
+        applicant_name: applicantName, job_title: jobTitle || '',
+        interview_round: round, interview_date: dateStr, interview_time: timeStr
+      });
+    }
+  } catch(e) { console.log('알림 발송 실패:', e); }
+}
+
 async function confirmSelection() {
   if (!selectedSlotId) return;
   const btn = document.getElementById('confirmBtn');
@@ -170,6 +200,16 @@ async function confirmSelection() {
   const dateText = slot.querySelector('.slot-date').textContent;
   const timeText = slot.querySelector('.slot-time').textContent;
   showSuccess(dateText, timeText);
+
+  // 면접관들에게 확정 알림 발송
+  const sel = window._currentSel;
+  if (sel) {
+    const applicantName = sel.applications?.name || sel.dispatch_candidates?.name || '-';
+    const jobId = sel.applications?.job_posting_id;
+    const jobTitle = sel.applications?.job_postings?.title;
+    const round = sel.interview_round || 1;
+    notifyInterviewersConfirmed(jobId, round, applicantName, jobTitle, dateText, timeText);
+  }
 }
 
 function showSuccess(date, time) {
