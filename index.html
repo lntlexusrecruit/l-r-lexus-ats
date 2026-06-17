@@ -529,8 +529,8 @@ async function showForm() {
       }, 100);
     }
     fd.essay = {
-      q1:app.essay_motivation, q2:app.essay_experience,
-      q3:app.essay_strength, q4:app.essay_goal
+      q1:app.essay_growth||app.essay_motivation, q2:app.essay_strength,
+      q3:app.essay_achievement||app.essay_experience, q4:app.essay_effort||app.essay_goal, q5:app.essay_motivation||app.essay_goal
     };
     // 학력/경력 불러오기
     const {data:edus} = await sb.from('education').select('*').eq('application_id',app.id).order('sort_order');
@@ -630,10 +630,11 @@ function buildPayload(isDraft) {
     work_type: fd.basic.workType||null,
     apply_source: fd.basic.source||[],
     skills: fd.basic.skills?.length ? fd.basic.skills : skills,
-    essay_motivation: fd.essay.q1||null,   // 성장과정
-    essay_experience: fd.essay.q3||null,  // 지원동기
-    essay_strength: fd.essay.q2||null,    // 성격장단점
-    essay_goal: fd.essay.q4||null,        // 목표및포부
+    essay_growth: fd.essay.q1||null,       // 성장과정
+    essay_strength: fd.essay.q2||null,    // 성격의장단점
+    essay_achievement: fd.essay.q3||null, // 성취/실패경험
+    essay_effort: fd.essay.q4||null,      // 노력/계획
+    essay_motivation: fd.essay.q5||null,  // 지원동기/포부
     link_github: fd.extra?.github||null,
     link_linkedin: fd.extra?.linkedin||null,
     link_blog: fd.extra?.blog||null,
@@ -934,8 +935,9 @@ function buildEssay(){
   const qs=[
     {k:'q1',t:'성장과정',h:'지원자님의 성장 과정을 구체적으로 작성해 주세요.',lim:1000},
     {k:'q2',t:'성격의 장단점',h:'본인의 장점과 단점을 솔직하게 작성해 주세요.',lim:800},
-    {k:'q3',t:'지원동기',h:'이 직무와 회사에 지원하게 된 동기를 구체적으로 작성해 주세요.',lim:1000},
-    {k:'q4',t:'입사 후 목표 및 포부',h:'입사 후 단기 및 장기 목표, 이루고 싶은 것을 작성해 주세요.',lim:800},
+    {k:'q3',t:'본인이 가장 큰 성취감을 느꼈던 일과 가장 큰 실패 경험',h:'성취 경험과 실패 경험을 구체적으로 작성해 주세요.',lim:1000},
+    {k:'q4',t:'현재 자신의 위치에 오기 위해 수행해온 노력과 지원한 직무분야에서 성공을 위한 노력(계획)',h:'자신의 노력과 앞으로의 계획을 작성해 주세요.',lim:1000},
+    {k:'q5',t:'당사를 선택한 이유와 입사 후 포부',h:'지원 동기와 입사 후 목표를 구체적으로 작성해 주세요.',lim:1000},
   ];
   qs.forEach(q=>{
     const c=mk('form-card');
@@ -1046,7 +1048,7 @@ function collectStep(){
     document.querySelectorAll('[data-ai]').forEach(el=>{const i=el.dataset.ai,k=el.dataset.k;if(!fd.extra.awards[i])fd.extra.awards[i]={};fd.extra.awards[i][k]=el.value;});
     document.querySelectorAll('[data-li]').forEach(el=>{const i=el.dataset.li,k=el.dataset.k;if(!fd.extra.langs[i])fd.extra.langs[i]={};fd.extra.langs[i][k]=el.value;});
   }
-  if(currentStep===4){['q1','q2','q3','q4'].forEach(k=>{const el=document.getElementById('ess_'+k);if(el)fd.essay[k]=el.value;});}
+  if(currentStep===4){['q1','q2','q3','q4','q5'].forEach(k=>{const el=document.getElementById('ess_'+k);if(el)fd.essay[k]=el.value;});}
 }
 
 // ── 유틸 ─────────────────────────────────────────────────
