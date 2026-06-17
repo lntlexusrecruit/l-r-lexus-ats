@@ -6,6 +6,7 @@
 <title>엘앤티렉서스 — 채용관리</title>
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script src="./emailjs.min.js"></script>
 <script src="./pizzip.js"></script>
 <script src="./docxtemplater.js"></script>
@@ -176,6 +177,39 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .stat-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:18px}
 .stat-val{font-size:28px;font-weight:300;color:var(--text);margin-bottom:2px}
 .stat-label{font-size:12px;color:var(--text3)}
+
+/* 통계 v2 - 차트 카드 */
+.stat-card2{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px 22px;text-align:center}
+.stat-card2 .stat-val2{font-size:30px;font-weight:300;margin-bottom:4px;line-height:1.1}
+.stat-card2 .stat-label2{font-size:12px;color:var(--text3)}
+.stat-card2 .stat-delta{font-size:11px;margin-top:6px;display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px}
+.stat-delta.up{background:var(--t50);color:var(--t800)}
+.stat-delta.down{background:var(--r50);color:var(--r600)}
+.stat-delta.flat{background:var(--gray100);color:var(--text3)}
+
+.chart-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px 22px;margin-bottom:16px;display:flex;flex-direction:column}
+.chart-card-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
+.chart-card-sub{font-size:11px;color:var(--text3);margin-bottom:14px}
+.chart-card .chart-canvas-wrap{position:relative;flex:1;min-height:0}
+.chart-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.chart-grid-2 .chart-card{height:320px}
+.chart-card.full{height:auto}
+.chart-card.tall{height:380px}
+
+.stats-section-label{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin:24px 0 10px;display:flex;align-items:center;gap:8px}
+.stats-section-label::after{content:'';flex:1;height:0.5px;background:var(--border2)}
+.stats-section-label:first-child{margin-top:0}
+
+.funnel-row{display:flex;align-items:stretch;gap:6px;margin-top:6px}
+.funnel-step{flex:1;display:flex;flex-direction:column;align-items:center;position:relative}
+.funnel-bar{width:100%;border-radius:var(--rsm);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 8px;min-height:64px;transition:all .3s}
+.funnel-num{font-size:20px;font-weight:600}
+.funnel-pct{font-size:10px;opacity:.75;margin-top:2px}
+.funnel-label{font-size:11px;color:var(--text2);margin-top:8px;text-align:center}
+.funnel-arrow{font-size:11px;color:var(--text3);padding:0 2px;display:flex;align-items:center}
+.funnel-dropoff{font-size:10px;color:var(--r600);margin-top:2px}
+
+.empty-stats{background:var(--surface);border:0.5px dashed var(--border2);border-radius:var(--radius);padding:40px 20px;text-align:center;color:var(--text3);font-size:13px}
 
 /* 필터 */
 .filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap}
@@ -486,7 +520,16 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         <div class="topbar">
           <div class="topbar-title">통계 대시보드</div>
           <select class="filter-select" id="statsJobFilter" onchange="renderStats()">
-            <option value="">전체 지원자</option>
+            <option value="">전체 공고</option>
+          </select>
+          <select class="filter-select" id="statsDeptFilter" onchange="renderStats()">
+            <option value="">전체 부서</option>
+          </select>
+          <select class="filter-select" id="statsPeriodFilter" onchange="renderStats()">
+            <option value="all">전체 기간</option>
+            <option value="30">최근 30일</option>
+            <option value="90">최근 90일</option>
+            <option value="365">최근 1년</option>
           </select>
           <button class="btn btn-sm" onclick="renderStats()">↻ 새로고침</button>
         </div>
@@ -837,6 +880,7 @@ const AV_COLORS=[{bg:'#EEEDFE',color:'#3C3489'},{bg:'#E1F5EE',color:'#085041'},{
 // ── 상태 ─────────────────────────────────────────────────
 let currentAdmin = null, adminProfile = null;
 let allApps = [], allJobs = [], allAdmins = [];
+let allStageHistory = [];
 let currentAppId = null, editJobId = null, editAdminId = null;
 let confirmCallback = null;
 
@@ -2059,37 +2103,98 @@ async function deleteSelected() {
 }
 
 // ── 통계 대시보드 ─────────────────────────────────────────
-function loadStats() {
-  const sel = document.getElementById('statsJobFilter');
-  sel.innerHTML = '<option value="">전체 지원자</option>';
+let _statsCharts = {}; // Chart.js 인스턴스 보관 (재렌더 시 destroy용)
+
+function destroyStatsCharts() {
+  Object.values(_statsCharts).forEach(ch => { try { ch.destroy(); } catch(e){} });
+  _statsCharts = {};
+}
+
+async function loadStats() {
+  // 공고 필터
+  const jobSel = document.getElementById('statsJobFilter');
+  jobSel.innerHTML = '<option value="">전체 공고</option>';
   allJobs.forEach(j => {
     const o = document.createElement('option');
-    o.value = j.id; o.textContent = j.title; sel.appendChild(o);
+    o.value = j.id; o.textContent = j.title; jobSel.appendChild(o);
   });
+
+  // 부서 필터 (job_postings.department 기준, 중복 제거)
+  const deptSel = document.getElementById('statsDeptFilter');
+  deptSel.innerHTML = '<option value="">전체 부서</option>';
+  const depts = [...new Set(allJobs.map(j => j.department).filter(Boolean))].sort();
+  depts.forEach(d => {
+    const o = document.createElement('option');
+    o.value = d; o.textContent = d; deptSel.appendChild(o);
+  });
+
+  // 단계 이력 로드 (퍼널/추이 분석용)
+  try {
+    const { data, error } = await sb.from('application_stage_history').select('*').order('changed_at', { ascending: true });
+    if (error) throw error;
+    allStageHistory = data || [];
+  } catch (e) {
+    console.error('stage history load error', e);
+    allStageHistory = [];
+  }
+
   renderStats();
 }
 
 function renderStats() {
-  const jobId = document.getElementById('statsJobFilter').value;
-  const apps = jobId ? allApps.filter(a => a.job_posting_id === jobId) : allApps;
-  const total = apps.length;
+  const jobId = document.getElementById('statsJobFilter')?.value || '';
+  const dept = document.getElementById('statsDeptFilter')?.value || '';
+  const period = document.getElementById('statsPeriodFilter')?.value || 'all';
   const c = document.getElementById('statsContent');
 
+  destroyStatsCharts();
+
+  // ── 필터링 ──
+  let apps = allApps.filter(a => !a.is_draft);
+  if (jobId) apps = apps.filter(a => a.job_posting_id === jobId);
+  if (dept) apps = apps.filter(a => (a.job_postings?.department || '') === dept);
+  if (period !== 'all') {
+    const cutoff = Date.now() - parseInt(period) * 86400000;
+    apps = apps.filter(a => a.submitted_at && new Date(a.submitted_at).getTime() >= cutoff);
+  }
+
+  const total = apps.length;
+
   if (!total) {
-    c.innerHTML = '<div class="empty-state"><div class="icon">📊</div><p>통계 데이터가 없습니다</p></div>';
+    c.innerHTML = '<div class="empty-stats">📊 조건에 맞는 지원자 데이터가 없습니다. 필터를 조정해보세요.</div>';
     return;
   }
 
-  // 데이터 계산
+  const appIds = new Set(apps.map(a => a.id));
+
+  // ── 핵심 지표 계산 ──
+  const finalPass = apps.filter(a => a.stage === '최종합격').length;
+  const rejected = apps.filter(a => a.stage === '불합격').length;
+  const inInterview = apps.filter(a => ['1차면접','2차면접'].includes(a.stage)).length;
+  const interviewRate = total ? Math.round((apps.filter(a=>['1차면접','2차면접','최종합격'].includes(a.stage)).length / total) * 100) : 0;
+  const passRate = total ? Math.round((finalPass / total) * 100) : 0;
+
+  // ── 파이프라인(퍼널) 단계별 인원 ──
   const byStage = {};
-  PIPELINE.forEach(p => byStage[p.label] = 0);
-  apps.forEach(a => {
-    const p = PIPELINE.find(p => p.key === (a.stage||'지원완료'));
-    if (p) byStage[p.label] = (byStage[p.label]||0) + 1;
+  PIPELINE.forEach(p => byStage[p.key] = 0);
+  apps.forEach(a => { const k = a.stage || '지원완료'; if (byStage[k] !== undefined) byStage[k]++; });
+
+  // 누적 퍼널: 각 단계 "도달" 인원 = 해당 단계 이상 진행된 사람 수 (불합격 제외하고 진행 단계 누적)
+  const funnelOrder = ['지원완료','관리자검토','1차면접','2차면접','최종합격'];
+  const stageRank = Object.fromEntries(funnelOrder.map((k,i)=>[k,i]));
+  const funnelCounts = funnelOrder.map(stageKey => {
+    const rank = stageRank[stageKey];
+    return apps.filter(a => {
+      const ar = stageRank[a.stage];
+      // 불합격된 사람도 이력상 도달했던 단계까지는 카운트하고 싶지만,
+      // 단순화를 위해 현재 stage 기준으로 도달 여부만 본다 (불합격 제외)
+      return ar !== undefined && ar >= rank;
+    }).length;
   });
 
+  // ── 인구통계 ──
   const byGender = {};
-  apps.forEach(a => { const g = a.gender||'미입력'; byGender[g] = (byGender[g]||0) + 1; });
+  apps.forEach(a => { const g = a.gender || '미입력'; byGender[g] = (byGender[g]||0) + 1; });
 
   const byAge = {'20대':0,'30대':0,'40대':0,'50대 이상':0,'미입력':0};
   apps.forEach(a => {
@@ -2102,73 +2207,216 @@ function renderStats() {
   });
 
   const bySource = {};
-  apps.forEach(a => {
-    (a.apply_source||['미입력']).forEach(s => { bySource[s] = (bySource[s]||0) + 1; });
-  });
+  apps.forEach(a => { (a.apply_source && a.apply_source.length ? a.apply_source : ['미입력']).forEach(s => { bySource[s] = (bySource[s]||0) + 1; }); });
 
   const byJob = {};
-  apps.forEach(a => {
-    const title = a.job_postings?.title || '미분류';
-    byJob[title] = (byJob[title]||0) + 1;
+  apps.forEach(a => { const title = a.job_postings?.title || '미분류'; byJob[title] = (byJob[title]||0) + 1; });
+
+  const byDept = {};
+  apps.forEach(a => { const d = a.job_postings?.department || '미분류'; byDept[d] = (byDept[d]||0) + 1; });
+
+  // 부서별 합격률 (지원자 5명 이상인 부서만)
+  const deptPassRate = {};
+  Object.keys(byDept).forEach(d => {
+    const deptApps = apps.filter(a => (a.job_postings?.department || '미분류') === d);
+    if (deptApps.length >= 3) {
+      deptPassRate[d] = Math.round((deptApps.filter(a=>a.stage==='최종합격').length / deptApps.length) * 100);
+    }
   });
 
-  const passRate = total ? Math.round((apps.filter(a=>a.stage==='최종합격').length / total) * 100) : 0;
-  const interviewRate = total ? Math.round((apps.filter(a=>['1차면접','2차면접','최종합격'].includes(a.stage)).length / total) * 100) : 0;
+  // ── 월별 지원자 추이 (최근 12개월) ──
+  const monthBuckets = [];
+  const now = new Date();
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    monthBuckets.push({ key: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label: `${d.getMonth()+1}월`, count: 0 });
+  }
+  const monthMap = Object.fromEntries(monthBuckets.map(m => [m.key, m]));
+  apps.forEach(a => {
+    if (!a.submitted_at) return;
+    const d = new Date(a.submitted_at);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if (monthMap[key]) monthMap[key].count++;
+  });
 
-  function barChart(data, colors) {
-    const max = Math.max(...Object.values(data), 1);
-    return Object.entries(data).filter(([,v])=>v>0).map(([k,v], i) => {
-      const color = colors ? colors[i % colors.length] : 'var(--accent)';
-      const pct = Math.round((v/max)*100);
-      return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="width:80px;font-size:12px;color:var(--text2);text-align:right;flex-shrink:0">${k}</div>
-        <div style="flex:1;background:var(--surface2);border-radius:4px;height:24px;overflow:hidden">
-          <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;display:flex;align-items:center;padding-left:8px;transition:width .5s">
-            <span style="font-size:11px;font-weight:600;color:rgba(0,0,0,0.6);white-space:nowrap">${v}명</span>
-          </div>
+  // ── 리드타임 (stage history 기반, 데이터 있으면 계산) ──
+  const leadTimes = []; // { applyToFinal, applyToInterview }
+  appIds.forEach(id => {
+    const hist = allStageHistory.filter(h => h.application_id === id).sort((a,b)=>new Date(a.changed_at)-new Date(b.changed_at));
+    if (!hist.length) return;
+    const applyTime = hist[0].changed_at;
+    const finalRow = hist.find(h => h.to_stage === '최종합격');
+    const interviewRow = hist.find(h => h.to_stage === '1차면접');
+    if (finalRow) leadTimes.push({ type: 'final', days: Math.round((new Date(finalRow.changed_at) - new Date(applyTime)) / 86400000) });
+    if (interviewRow) leadTimes.push({ type: 'interview', days: Math.round((new Date(interviewRow.changed_at) - new Date(applyTime)) / 86400000) });
+  });
+  const finalLeadTimes = leadTimes.filter(l=>l.type==='final').map(l=>l.days).filter(d=>d>=0);
+  const avgFinalLead = finalLeadTimes.length ? Math.round(finalLeadTimes.reduce((a,b)=>a+b,0)/finalLeadTimes.length) : null;
+  const historyDays = allStageHistory.length ? Math.round((Date.now() - new Date(allStageHistory[0].changed_at).getTime()) / 86400000) : 0;
+
+  // ── 색상 토큰 (기존 디자인 시스템과 통일) ──
+  const palette = ['#A8C5E8','#B5D5C5','#F5C6A0','#C5B8E8','#F0B8C8','#B8D8E8','#D4C5A9','#9E9C97'];
+  const stageColorMap = { '지원완료':'#888780','관리자검토':'#B25C00','1차면접':'#534AB7','2차면접':'#185FA5','최종합격':'#3B6D11','불합격':'#A32D2D' };
+
+  function statCard2(val, label, color, delta) {
+    const deltaHtml = delta ? `<div class="stat-delta ${delta.dir}">${delta.text}</div>` : '';
+    return `<div class="stat-card2"><div class="stat-val2" style="color:${color}">${val}</div><div class="stat-label2">${label}</div>${deltaHtml}</div>`;
+  }
+
+  function chartCard(title, sub, canvasId, sizeClass='') {
+    return `<div class="chart-card ${sizeClass}">
+      <div class="chart-card-title">${title}</div>
+      ${sub ? `<div class="chart-card-sub">${sub}</div>` : ''}
+      <div class="chart-canvas-wrap"><canvas id="${canvasId}"></canvas></div>
+    </div>`;
+  }
+
+  function funnelHtml() {
+    const labels = { '지원완료':'지원','관리자검토':'서류검토','1차면접':'1차면접','2차면접':'2차면접','최종합격':'최종합격' };
+    return `<div class="funnel-row">` + funnelOrder.map((key, i) => {
+      const cnt = funnelCounts[i];
+      const pct = total ? Math.round((cnt/total)*100) : 0;
+      const dropPct = i > 0 && funnelCounts[i-1] ? Math.round(((funnelCounts[i-1]-cnt)/funnelCounts[i-1])*100) : null;
+      const color = stageColorMap[key];
+      const step = `<div class="funnel-step">
+        <div class="funnel-bar" style="background:${color}1A;border:1.5px solid ${color}55">
+          <div class="funnel-num" style="color:${color}">${cnt}</div>
+          <div class="funnel-pct" style="color:${color}">${pct}%</div>
         </div>
-        <div style="width:36px;font-size:12px;color:var(--text3);flex-shrink:0">${Math.round(v/total*100)}%</div>
+        <div class="funnel-label">${labels[key]}</div>
       </div>`;
-    }).join('');
+      if (i === 0) return step;
+      return `<div class="funnel-arrow">${dropPct !== null ? `<div style="text-align:center"><div>→</div><div class="funnel-dropoff">-${dropPct}%</div></div>` : '→'}</div>` + step;
+    }).join('') + `</div>`;
   }
-
-  function statBox(val, label, color='#7B8FA1') {
-    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center">
-      <div style="font-size:32px;font-weight:300;color:${color};margin-bottom:4px">${val}</div>
-      <div style="font-size:12px;color:var(--text3)">${label}</div>
-    </div>`;
-  }
-
-  function card(title, content) {
-    return `<div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:16px">${title}</div>
-      ${content}
-    </div>`;
-  }
-
-  // 파스텔 색상
-  const pastel = ['#A8C5E8','#B5D5C5','#F5C6A0','#C5B8E8','#F0B8C8','#B8D8E8','#D4C5A9'];
-  const stageColors = ['#C8C5E8','#A8C5E8','#B8D8C8','#B8E8C8','#F0C8C8'];
 
   c.innerHTML = `
-    <!-- 핵심 지표 -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">
-      ${statBox(total, '전체 지원자', '#7B8FA1')}
-      ${statBox(apps.filter(a=>a.stage==='최종합격').length, '최종 합격', '#7BAE8F')}
-      ${statBox(interviewRate+'%', '면접 전환율', '#7B9EC4')}
-      ${statBox(passRate+'%', '최종 합격률', '#7BAE8F')}
+    <div class="stats-section-label">핵심 지표</div>
+    <div class="stats-grid" style="margin-bottom:8px">
+      ${statCard2(total, '전체 지원자', '#7B8FA1')}
+      ${statCard2(finalPass, '최종 합격', '#7BAE8F')}
+      ${statCard2(interviewRate+'%', '면접 전환율', '#7B9EC4')}
+      ${statCard2(passRate+'%', '최종 합격률', '#7BAE8F')}
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-      ${card('파이프라인 현황', barChart(byStage, stageColors))}
-      ${card('지원 경로별', barChart(bySource, pastel))}
-      ${card('성별 분포', barChart(byGender, ['#A8C5E8','#F0B8C8','#C8C8C8']))}
-      ${card('나이대 분포', barChart(byAge, pastel))}
+    <div class="stats-section-label">채용 퍼널</div>
+    <div class="chart-card full">
+      <div class="chart-card-title">단계별 진행 현황</div>
+      <div class="chart-card-sub">각 단계에 도달한 인원 기준 (불합격 제외)</div>
+      ${funnelHtml()}
     </div>
 
-    ${!jobId ? card('채용 공고별 지원자', barChart(byJob, pastel)) : ''}
+    <div class="stats-section-label">분포 분석</div>
+    <div class="chart-grid-2">
+      ${chartCard('지원 경로별', null, 'chartSource')}
+      ${chartCard('성별 분포', null, 'chartGender')}
+      ${chartCard('나이대 분포', null, 'chartAge')}
+      ${chartCard('부서별 지원자', null, 'chartDept')}
+    </div>
+
+    <div class="stats-section-label">추이 &amp; 비교</div>
+    <div class="chart-grid-2">
+      ${chartCard('월별 지원자 추이', '최근 12개월', 'chartTrend')}
+      ${Object.keys(deptPassRate).length ? chartCard('부서별 최종 합격률', '지원자 3명 이상 부서만 표시', 'chartDeptPass') : '<div class="chart-card" style="align-items:center;justify-content:center;color:var(--text3);font-size:12px">부서별 합격률을 보려면 부서당 3명 이상 지원자가 필요합니다</div>'}
+    </div>
+
+    ${!jobId ? `<div class="stats-section-label">공고별 지원자</div>${chartCard('채용 공고별 지원자 수', null, 'chartByJob', 'tall')}` : ''}
+
+    <div class="stats-section-label">리드타임 (지원 → 최종합격)</div>
+    ${avgFinalLead !== null ? `
+      <div class="stats-grid" style="grid-template-columns:repeat(2,1fr)">
+        ${statCard2(avgFinalLead+'일', '평균 리드타임', '#7B9EC4')}
+        ${statCard2(finalLeadTimes.length+'명', '측정 가능 인원', '#9E9C97')}
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px">단계 이력 기록 시작 후 ${historyDays}일째 — 데이터가 쌓일수록 정확도가 높아집니다</div>
+    ` : `<div class="empty-stats">⏱ 리드타임 데이터를 모으고 있습니다. 단계 변경 이력이 충분히 쌓이면 (지원~최종합격까지 걸린 기간) 여기에 표시됩니다.</div>`}
   `;
+
+  // ── Chart.js 렌더링 ──
+  const fontFamily = "'Pretendard', sans-serif";
+  Chart.defaults.font.family = fontFamily;
+  Chart.defaults.color = '#5F5E5A';
+
+  function donut(canvasId, dataObj, colors) {
+    const entries = Object.entries(dataObj).filter(([,v])=>v>0);
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    _statsCharts[canvasId] = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: entries.map(([k])=>k),
+        datasets: [{ data: entries.map(([,v])=>v), backgroundColor: colors, borderWidth: 0 }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } } }
+      }
+    });
+  }
+
+  donut('chartSource', bySource, palette);
+  donut('chartGender', byGender, ['#A8C5E8','#F0B8C8','#C8C8C8']);
+  donut('chartAge', byAge, palette);
+  donut('chartDept', byDept, palette);
+
+  // 월별 추이 라인차트
+  const trendCtx = document.getElementById('chartTrend');
+  if (trendCtx) {
+    _statsCharts.chartTrend = new Chart(trendCtx, {
+      type: 'line',
+      data: {
+        labels: monthBuckets.map(m=>m.label),
+        datasets: [{
+          label: '지원자 수', data: monthBuckets.map(m=>m.count),
+          borderColor: '#534AB7', backgroundColor: 'rgba(83,74,183,0.08)',
+          fill: true, tension: 0.35, pointRadius: 3, pointBackgroundColor: '#534AB7'
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+
+  // 부서별 합격률 바차트
+  const deptPassCtx = document.getElementById('chartDeptPass');
+  if (deptPassCtx && Object.keys(deptPassRate).length) {
+    _statsCharts.chartDeptPass = new Chart(deptPassCtx, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(deptPassRate),
+        datasets: [{ label: '최종 합격률(%)', data: Object.values(deptPassRate), backgroundColor: '#B5D5C5', borderRadius: 6 }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } } }
+      }
+    });
+  }
+
+  // 공고별 지원자 (전체 공고 보기일 때만)
+  const byJobCtx = document.getElementById('chartByJob');
+  if (byJobCtx) {
+    const sorted = Object.entries(byJob).sort((a,b)=>b[1]-a[1]);
+    _statsCharts.chartByJob = new Chart(byJobCtx, {
+      type: 'bar',
+      data: {
+        labels: sorted.map(([k])=>k),
+        datasets: [{ label: '지원자 수', data: sorted.map(([,v])=>v), backgroundColor: '#A8C5E8', borderRadius: 6 }]
+      },
+      options: {
+        indexAxis: 'y',
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
 }
+
 
 function hideLoading(){document.getElementById('loadingOverlay')?.classList.add('hidden');}
 function showLoading(txt){
