@@ -221,9 +221,9 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .home-job-row-name{font-size:13px;font-weight:600;color:var(--text)}
 .home-job-row-dept{font-size:11px;color:var(--text2)}
 .home-job-row-stats{display:flex;gap:8px;flex-shrink:0}
-.home-ministat{min-width:64px;padding:6px 10px;border-radius:var(--rxs);text-align:center}
-.home-ministat-val{font-size:16px;font-weight:700;line-height:1.1}
-.home-ministat-label{font-size:10px;color:var(--text2);margin-top:2px;white-space:nowrap}
+.home-ministat{width:80px;height:80px;padding:8px 6px;border-radius:var(--rsm);text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
+.home-ministat-val{font-size:26px;font-weight:700;line-height:1.1}
+.home-ministat-label{font-size:13px;font-weight:500;color:var(--text2);margin-top:4px;line-height:1.25}
 .home-ministat.clickable{cursor:pointer;transition:transform .12s, box-shadow .12s}
 .home-ministat.clickable:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
 
@@ -388,7 +388,7 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
         <div class="sb-label" id="recruitMenuLabel">채용 관리</div>
         <div id="recruitMenu">
           <button class="sb-link" id="sbDashboard" onclick="showPage('dashboard',this)">⊡ 공고 현황 <span class="sb-badge" id="sbTotal">0</span></button>
-          <button class="sb-link" onclick="showPage('interviewroom',this)">🎤 면접 진행 <span class="sb-badge" id="sbInterview">0</span></button>
+          <button class="sb-link" id="sbInterviewroom" onclick="showPage('interviewroom',this)">🎤 면접 진행 <span class="sb-badge" id="sbInterview">0</span></button>
           <button class="sb-link" onclick="showPage('jobs',this)">⊞ 채용 공고 <span class="sb-badge" id="sbJobs">0</span></button>
           <div id="superOnlyMenu" class="hidden">
             <button class="sb-link" onclick="showPage('candidates',this)">☰ 지원자 관리</button>
@@ -1139,10 +1139,11 @@ function jobTodoRowHtml(jobMeta, todos, isDispatch) {
   const goPipeline = isDispatch
     ? `openDispatchDetail('${id}')`
     : `openJobPipeline('${id}')`;
+  const goInterviewRoom = `showPage('interviewroom', document.getElementById('sbInterviewroom'))`;
 
-  function miniStat(count, label, color, bg) {
+  function miniStat(count, label, color, bg, action) {
     const clickable = count > 0;
-    return `<div class="${clickable?'home-ministat clickable':'home-ministat'}" ${clickable ? `onclick="${goPipeline}"` : ''} style="background:${bg}">
+    return `<div class="${clickable?'home-ministat clickable':'home-ministat'}" ${clickable ? `onclick="${action}"` : ''} style="background:${bg}">
       <div class="home-ministat-val" style="color:${color}">${count}</div>
       <div class="home-ministat-label">${label}</div>
     </div>`;
@@ -1154,10 +1155,10 @@ function jobTodoRowHtml(jobMeta, todos, isDispatch) {
       <span class="home-job-row-dept">${jobMeta.department || ''}</span>
     </div>
     <div class="home-job-row-stats">
-      ${miniStat(reviewNeeded.length, '검토 필요', '#B25C00', '#FEF3E2')}
-      ${miniStat(waitingSchedule.length, '일정 대기', '#534AB7', '#EEEDFE')}
-      ${miniStat(upcomingInterviews.length, '예정 면접', '#185FA5', '#E6F1FB')}
-      ${miniStat(decisionNeeded.length, '합/불 대기', '#A32D2D', '#FCEBEB')}
+      ${miniStat(reviewNeeded.length, '검토 필요', '#B25C00', '#FEF3E2', goPipeline)}
+      ${miniStat(waitingSchedule.length, '면접 일정<br>입력 대기', '#534AB7', '#EEEDFE', goPipeline)}
+      ${miniStat(upcomingInterviews.length, '면접 예정', '#185FA5', '#E6F1FB', goInterviewRoom)}
+      ${miniStat(decisionNeeded.length, '합/불 대기', '#A32D2D', '#FCEBEB', goPipeline)}
     </div>
   </div>`;
 }
