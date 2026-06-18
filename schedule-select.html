@@ -62,48 +62,45 @@ function formatTime(t) {
   return `${hour < 12 ? '오전' : '오후'} ${hour <= 12 ? hour : hour-12}:${m}`;
 }
 
-const EXPIRE_HOURS = 2; // 선택 제한 시간
+const EDGE_FN_BASE = `${SUPABASE_URL}/functions/v1/`;
+
+async function callEdgeFunction(name, body) {
+  const res = await fetch(EDGE_FN_BASE + name, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + SUPABASE_KEY,
+      'apikey': SUPABASE_KEY
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  return { ok: res.ok, status: res.status, data };
+}
+
+const EXPIRE_HOURS = 2; // 선택 제한 시간 (서버에서도 동일하게 재검증함)
 
 async function init() {
   if (!token) { showError('유효하지 않은 링크입니다'); return; }
 
-  const { data: sel } = await sb.from('interview_selections')
-    .select('*, applications(name, email, job_posting_id, job_postings(title)), dispatch_candidates(name)')
-    .eq('token', token).maybeSingle();
+  const { ok, data } = await callEdgeFunction('get-interview-slots', { token });
 
-  if (!sel) { showError('유효하지 않은 링크이거나 만료되었습니다'); return; }
-  selectionId = sel.id;
-  window._currentSel = sel; // 알림 발송용 전역 저장
-
-  // 이미 선택 완료
-  if (sel.slot_id) {
-    const { data: slot } = await sb.from('interview_slots').select('*').eq('id', sel.slot_id).single();
-    showAlreadySelected(sel, slot);
+  if (!ok || data.error) {
+    showError(data.message || data.error || '유효하지 않은 링크이거나 만료되었습니다');
     return;
   }
 
-  // 만료 체크 (expires_at 기준, 없으면 created_at + 2시간)
-  const createdAt = new Date(sel.created_at || Date.now());
-  const expiresAt = sel.expires_at ? new Date(sel.expires_at) : new Date(createdAt.getTime() + EXPIRE_HOURS * 60 * 60 * 1000);
-  if (new Date() > expiresAt) {
-    showError('면접 일정 선택 시간이 만료되었습니다.\n\n담당자에게 연락해 주세요.\n📞 02-2188-3565');
+  // 이미 선택 완료
+  if (data.status === 'already_selected') {
+    showAlreadySelected(data.name, data.slot);
     return;
   }
 
   // 만료까지 남은 시간 표시용 타이머 세팅
-  window._expiresAt = expiresAt;
+  window._expiresAt = new Date(data.expiresAt);
+  window._currentToken = token;
 
-  const appId = sel.application_id || sel.dispatch_candidate_id;
-  const col = sel.application_id ? 'application_id' : 'dispatch_candidate_id';
-  const round = sel.interview_round || 1;
-  const { data: slots } = await sb.from('interview_slots')
-    .select('*').eq(col, appId).eq('is_confirmed', true).eq('interview_round', round).order('slot_date').order('slot_time');
-
-  if (!slots?.length) { showError('아직 확정된 면접 일정이 없습니다.\n담당자에게 문의해주세요.\n📞 02-2188-3565'); return; }
-
-  const name = sel.applications?.name || sel.dispatch_candidates?.name || '지원자';
-  // DB에서 이미 1시간 단위로 저장됨 - 그대로 표시
-  showSlots(name, slots);
+  showSlots(data.name, data.slots);
 }
 
 function showSlots(name, slots) {
@@ -163,21 +160,11 @@ const EMAILJS_SERVICE_ID = 'service_lntlexusrecruit';
 const EMAILJS_TEMPLATE_INTERVIEW = 'template_ju4wzpu';
 if (window.emailjs) emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
 
-async function notifyInterviewersConfirmed(jobId, round, applicantName, jobTitle, dateStr, timeStr) {
+async function sendInterviewerEmails(recipients, applicantName, jobTitle, round, dateStr, timeStr) {
   try {
-    if (!jobId) return;
-    const ivTable = round === 2 ? 'job_interviewers_2nd' : 'job_interviewers';
-    const [{ data: perms }, { data: ivs }] = await Promise.all([
-      sb.from('admin_job_permissions').select('admin_profiles(name, email)').eq('job_posting_id', jobId),
-      sb.from(ivTable).select('admin_profiles(name, email)').eq('job_id', jobId)
-    ]);
-    const recipients = new Map();
-    [...(perms||[]), ...(ivs||[])].forEach(p => {
-      if (p.admin_profiles?.email) recipients.set(p.admin_profiles.email, p.admin_profiles.name);
-    });
-    for (const [email, name] of recipients) {
+    for (const r of (recipients || [])) {
       await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_INTERVIEW, {
-        email, to_name: name || '담당자',
+        email: r.email, to_name: r.name || '담당자',
         applicant_name: applicantName, job_title: jobTitle || '',
         interview_round: round, interview_date: dateStr, interview_time: timeStr
       });
@@ -190,26 +177,21 @@ async function confirmSelection() {
   const btn = document.getElementById('confirmBtn');
   btn.disabled = true; btn.textContent = '처리 중...';
 
-  const { error } = await sb.from('interview_selections')
-    .update({ slot_id: selectedSlotId, selected_at: new Date().toISOString() })
-    .eq('token', token);
+  const { ok, data } = await callEdgeFunction('confirm-interview-slot', { token, slotId: selectedSlotId });
 
-  if (error) { btn.disabled = false; btn.textContent = '선택 완료'; alert('오류가 발생했습니다. 다시 시도해주세요.'); return; }
+  if (!ok || data.error) {
+    btn.disabled = false; btn.textContent = '선택 완료';
+    alert(data.error || '오류가 발생했습니다. 다시 시도해주세요.');
+    return;
+  }
 
   const slot = document.querySelector('.slot.selected');
   const dateText = slot.querySelector('.slot-date').textContent;
   const timeText = slot.querySelector('.slot-time').textContent;
   showSuccess(dateText, timeText);
 
-  // 면접관들에게 확정 알림 발송
-  const sel = window._currentSel;
-  if (sel) {
-    const applicantName = sel.applications?.name || sel.dispatch_candidates?.name || '-';
-    const jobId = sel.applications?.job_posting_id;
-    const jobTitle = sel.applications?.job_postings?.title;
-    const round = sel.interview_round || 1;
-    notifyInterviewersConfirmed(jobId, round, applicantName, jobTitle, dateText, timeText);
-  }
+  // 면접관들에게 확정 알림 발송 (수신자 목록은 서버에서 이미 검증/계산되어 내려옴)
+  sendInterviewerEmails(data.recipients, data.applicantName, data.jobTitle, data.round, dateText, timeText);
 }
 
 function showSuccess(date, time) {
@@ -232,7 +214,7 @@ function showSuccess(date, time) {
   `;
 }
 
-function showAlreadySelected(sel, slot) {
+function showAlreadySelected(name, slot) {
   document.getElementById('app').innerHTML = `
     <div class="logo">엘앤티렉서스(주) 채용</div>
     <div class="success">
