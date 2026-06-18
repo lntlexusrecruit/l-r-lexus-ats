@@ -128,20 +128,34 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .iv-room-layout{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
 .iv-room-left{position:sticky;top:0}
 .iv-room-right{min-width:0}
+.iv-unscheduled-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
 .iv-cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
 .iv-cal-title{font-size:14px;font-weight:700;color:var(--text)}
-.iv-cal-weekrow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px}
+.iv-cal-weekrow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:4px}
 .iv-cal-weeklabel{text-align:center;font-size:11px;color:var(--text3);padding:4px 0}
-.iv-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
-.iv-cal-cell{min-height:58px;border-radius:var(--rxs);padding:4px;background:var(--surface);border:0.5px solid var(--border)}
+.iv-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:116px;gap:3px}
+.iv-cal-cell{height:116px;min-width:0;overflow:hidden;border-radius:var(--rxs);padding:4px;background:var(--surface);border:0.5px solid var(--border);display:flex;flex-direction:column}
 .iv-cal-cell.empty{background:transparent;border:none}
 .iv-cal-cell.today{border:1.5px solid var(--accent)}
 .iv-cal-cell.has-items{background:#EEEDFE}
 .iv-cal-cell.clickable{cursor:pointer;transition:transform .1s}
 .iv-cal-cell.clickable:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+.iv-cal-daynum{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:2px;flex-shrink:0}
+.iv-cal-chips{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:2px}
+.iv-cal-chip{font-size:9px;background:#534AB7;color:#fff;border-radius:4px;padding:1px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
 .iv-cal-daynum{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:2px}
 .iv-cal-chip{font-size:9px;background:#534AB7;color:#fff;border-radius:4px;padding:1px 4px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.iv-cal-more{font-size:9px;color:var(--text3)}
+.iv-cal-more{font-size:9px;color:var(--text3);cursor:pointer;text-decoration:underline;flex-shrink:0}
+
+/* 캘린더 날짜별 명단 팝오버 */
+.iv-day-popover{position:fixed;width:220px;max-height:320px;overflow-y:auto;background:var(--surface);border:0.5px solid var(--border2);border-radius:var(--rsm);box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:10px;z-index:1000}
+.iv-day-popover-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.iv-day-popover-list{display:flex;flex-direction:column;gap:4px}
+.iv-day-popover-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:var(--rxs);cursor:pointer;transition:background .12s}
+.iv-day-popover-item:hover{background:#EEEDFE}
+.iv-day-popover-time{font-size:11px;font-weight:600;color:#534AB7;flex-shrink:0;min-width:50px}
+.iv-day-popover-name{font-size:12px;font-weight:600;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iv-day-popover-round{font-size:9px;color:var(--text3);flex-shrink:0}
 /* 면접 세션 */
 .iv-session-grid{display:grid;grid-template-columns:1fr 1fr 300px;gap:16px;height:calc(100vh - 140px)}
 .iv-resume-panel{overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;font-size:15px}
@@ -240,9 +254,9 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .home-job-row-name{font-size:17px;font-weight:600;color:var(--text)}
 .home-job-row-dept{font-size:11px;color:var(--text2)}
 .home-job-row-stats{display:flex;gap:6px;flex-wrap:nowrap}
-.home-ministat{flex:1;min-width:0;height:54px;padding:4px 4px;border-radius:var(--rxs);text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.home-ministat-val{font-size:17px;font-weight:700;line-height:1.1}
-.home-ministat-label{font-size:9px;font-weight:500;color:var(--text2);margin-top:2px;line-height:1.2}
+.home-ministat{flex:1;min-width:0;height:54px;padding:6px 8px;border-radius:var(--rxs);display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:6px}
+.home-ministat-label{font-size:12px;font-weight:600;color:var(--text2);line-height:1.25;text-align:left}
+.home-ministat-val{font-size:20px;font-weight:700;line-height:1.1;flex-shrink:0}
 .home-ministat.clickable{cursor:pointer;transition:transform .12s, box-shadow .12s}
 .home-ministat.clickable:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
 
@@ -1163,8 +1177,8 @@ function jobTodoRowHtml(jobMeta, todos, isDispatch) {
   function miniStat(count, label, color, bg, action) {
     const clickable = count > 0;
     return `<div class="${clickable?'home-ministat clickable':'home-ministat'}" ${clickable ? `onclick="${action}"` : ''} style="background:${bg}">
-      <div class="home-ministat-val" style="color:${color}">${count}</div>
       <div class="home-ministat-label">${label}</div>
+      <div class="home-ministat-val" style="color:${color}">${count}</div>
     </div>`;
   }
 
@@ -3892,10 +3906,10 @@ async function loadInterviewRoom() {
     <div class="iv-room-layout">
       <div class="iv-room-left">
         <div id="ivCalendarWrap"></div>
-        <div id="ivUnscheduledWrap"></div>
       </div>
       <div class="iv-room-right" id="ivListWrap"></div>
     </div>
+    <div id="ivUnscheduledWrap"></div>
   `;
 
   renderIvCalendar();
@@ -3931,10 +3945,12 @@ function renderIvCalendar() {
     const items = byDate[dateStr] || [];
     const isToday = dateStr === todayStr;
     const dow = new Date(year, month, d).getDay();
-    cells += `<div class="iv-cal-cell ${items.length ? 'has-items clickable' : ''} ${isToday ? 'today' : ''}" ${items.length ? `onclick="ivScrollToDate('${dateStr}')"` : ''}>
+    cells += `<div class="iv-cal-cell ${items.length ? 'has-items clickable' : ''} ${isToday ? 'today' : ''}" id="ivcell-${dateStr}" ${items.length ? `onclick="ivScrollToDate('${dateStr}')"` : ''}>
       <div class="iv-cal-daynum" style="color:${dow===0?'#A32D2D':dow===6?'#185FA5':'inherit'}">${d}</div>
-      ${items.slice(0,2).map(({app, slot}) => `<div class="iv-cal-chip">${slot ? formatSlotTime(slot.slot_time).replace('오전','오전 ').replace('오후','오후 ') : ''} ${app.name}</div>`).join('')}
-      ${items.length > 2 ? `<div class="iv-cal-more">+${items.length-2}명 더</div>` : ''}
+      <div class="iv-cal-chips">
+        ${items.slice(0,4).map(({app, slot}) => `<div class="iv-cal-chip">${slot ? formatSlotTime(slot.slot_time).replace('오전','오전 ').replace('오후','오후 ') : ''} ${app.name}</div>`).join('')}
+        ${items.length > 4 ? `<div class="iv-cal-more" onclick="event.stopPropagation(); ivShowDayPopover('${dateStr}', this)">+${items.length-4}명 더</div>` : ''}
+      </div>
     </div>`;
   }
 
@@ -3950,8 +3966,63 @@ function renderIvCalendar() {
 }
 
 function ivScrollToDate(dateStr) {
+  ivClosePopover();
   const el = document.getElementById('ivdate-' + dateStr);
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function ivClosePopover() {
+  document.getElementById('ivDayPopover')?.remove();
+  document.removeEventListener('click', ivPopoverOutsideClick);
+}
+
+function ivPopoverOutsideClick(e) {
+  const pop = document.getElementById('ivDayPopover');
+  if (pop && !pop.contains(e.target)) ivClosePopover();
+}
+
+function ivShowDayPopover(dateStr, triggerEl) {
+  ivClosePopover(); // 기존에 열려있던 팝오버 닫기
+
+  const items = (window._ivRoomByDate || {})[dateStr] || [];
+  if (!items.length) return;
+
+  const cell = document.getElementById('ivcell-' + dateStr) || triggerEl;
+  const rect = cell.getBoundingClientRect();
+  const dt = new Date(dateStr);
+  const dateLabel = `${dt.getMonth()+1}월 ${dt.getDate()}일 (${['일','월','화','수','목','금','토'][dt.getDay()]})`;
+
+  const pop = document.createElement('div');
+  pop.id = 'ivDayPopover';
+  pop.className = 'iv-day-popover';
+  pop.innerHTML = `
+    <div class="iv-day-popover-title">${dateLabel} <span style="color:var(--text3);font-weight:400">${items.length}명</span></div>
+    <div class="iv-day-popover-list">
+      ${items.map(({app, slot}) => {
+        const timeStr = slot ? formatSlotTime(slot.slot_time) : '시간 미정';
+        const roundLabel = app.stage === '2차면접' ? '2차' : '1차';
+        return `<div class="iv-day-popover-item" onclick="ivClosePopover(); openInterviewSession('${app.id}',false)">
+          <span class="iv-day-popover-time">${timeStr}</span>
+          <span class="iv-day-popover-name">${app.name}</span>
+          <span class="iv-day-popover-round">${roundLabel}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+  document.body.appendChild(pop);
+
+  // 위치 계산: 셀 오른쪽에 붙이되, 화면 밖으로 나가면 왼쪽에 붙임
+  const popWidth = 220;
+  let left = rect.right + 8;
+  if (left + popWidth > window.innerWidth) left = rect.left - popWidth - 8;
+  let top = rect.top;
+  const popHeightEstimate = Math.min(items.length, 8) * 36 + 40;
+  if (top + popHeightEstimate > window.innerHeight) top = Math.max(8, window.innerHeight - popHeightEstimate - 8);
+
+  pop.style.left = left + 'px';
+  pop.style.top = top + 'px';
+
+  setTimeout(() => document.addEventListener('click', ivPopoverOutsideClick), 0);
 }
 
 function renderIvUnscheduled(unscheduled) {
@@ -3959,9 +4030,11 @@ function renderIvUnscheduled(unscheduled) {
   if (!wrap) return;
   if (!unscheduled.length) { wrap.innerHTML = ''; return; }
   wrap.innerHTML = `
-    <div class="iv-room-group" style="margin-top:14px">
+    <div class="iv-room-group" style="margin-top:28px">
       <div class="iv-room-date">📋 일정 미지정 <span style="font-size:12px;font-weight:400;color:var(--text3)">${unscheduled.length}명</span></div>
-      ${unscheduled.map(({app}) => ivCardHtml(app, null)).join('')}
+      <div class="iv-unscheduled-grid">
+        ${unscheduled.map(({app}) => ivCardHtml(app, null)).join('')}
+      </div>
     </div>
   `;
 }
