@@ -123,6 +123,25 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .iv-room-name{font-size:16px;font-weight:700;color:#1a1a1a}
 .iv-room-job{font-size:12px;color:#666;margin-top:2px}
 .iv-room-status{margin-left:auto;font-size:12px;padding:4px 12px;border-radius:20px;font-weight:600;white-space:nowrap}
+
+/* 면접 진행 - 캘린더 레이아웃 */
+.iv-room-layout{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start}
+.iv-room-left{position:sticky;top:0}
+.iv-room-right{min-width:0}
+.iv-cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.iv-cal-title{font-size:14px;font-weight:700;color:var(--text)}
+.iv-cal-weekrow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px}
+.iv-cal-weeklabel{text-align:center;font-size:11px;color:var(--text3);padding:4px 0}
+.iv-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.iv-cal-cell{min-height:58px;border-radius:var(--rxs);padding:4px;background:var(--surface);border:0.5px solid var(--border)}
+.iv-cal-cell.empty{background:transparent;border:none}
+.iv-cal-cell.today{border:1.5px solid var(--accent)}
+.iv-cal-cell.has-items{background:#EEEDFE}
+.iv-cal-cell.clickable{cursor:pointer;transition:transform .1s}
+.iv-cal-cell.clickable:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
+.iv-cal-daynum{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:2px}
+.iv-cal-chip{font-size:9px;background:#534AB7;color:#fff;border-radius:4px;padding:1px 4px;margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iv-cal-more{font-size:9px;color:var(--text3)}
 /* 면접 세션 */
 .iv-session-grid{display:grid;grid-template-columns:1fr 1fr 300px;gap:16px;height:calc(100vh - 140px)}
 .iv-resume-panel{overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;font-size:15px}
@@ -215,15 +234,15 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .empty-stats{background:var(--surface);border:0.5px dashed var(--border2);border-radius:var(--radius);padding:40px 20px;text-align:center;color:var(--text2);font-size:13px}
 
 /* 홈 - 공고별 할 일 행 */
-.home-job-list{display:flex;flex-direction:column;gap:8px;margin-bottom:20px}
-.home-job-row{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rsm);padding:12px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
-.home-job-row-title{flex:1;min-width:240px;display:flex;flex-direction:column;gap:4px}
-.home-job-row-name{font-size:26px;font-weight:600;color:var(--text)}
-.home-job-row-dept{font-size:14px;color:var(--text2)}
-.home-job-row-stats{display:flex;gap:8px;flex-shrink:0}
-.home-ministat{width:80px;height:80px;padding:8px 6px;border-radius:var(--rsm);text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0}
-.home-ministat-val{font-size:26px;font-weight:700;line-height:1.1}
-.home-ministat-label{font-size:13px;font-weight:500;color:var(--text2);margin-top:4px;line-height:1.25}
+.home-job-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.home-job-row{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--rsm);padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.home-job-row-title{display:flex;flex-direction:column;gap:2px}
+.home-job-row-name{font-size:17px;font-weight:600;color:var(--text)}
+.home-job-row-dept{font-size:11px;color:var(--text2)}
+.home-job-row-stats{display:flex;gap:6px;flex-wrap:nowrap}
+.home-ministat{flex:1;min-width:0;height:54px;padding:4px 4px;border-radius:var(--rxs);text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.home-ministat-val{font-size:17px;font-weight:700;line-height:1.1}
+.home-ministat-label{font-size:9px;font-weight:500;color:var(--text2);margin-top:2px;line-height:1.2}
 .home-ministat.clickable{cursor:pointer;transition:transform .12s, box-shadow .12s}
 .home-ministat.clickable:hover{transform:translateY(-1px);box-shadow:0 2px 6px rgba(0,0,0,0.08)}
 
@@ -3851,12 +3870,11 @@ async function loadInterviewRoom() {
     byDate[date].push({ app, slot });
   });
 
+  window._ivRoomByDate = byDate; // 달력 월 이동 시 재사용
+
   // 오늘/미래 순 정렬
-  const sortedDates = Object.keys(byDate).sort((a,b) => {
-    if (a==='unscheduled') return 1;
-    if (b==='unscheduled') return -1;
-    return a.localeCompare(b);
-  });
+  const sortedDates = Object.keys(byDate).filter(d => d !== 'unscheduled').sort((a,b) => a.localeCompare(b));
+  const unscheduled = byDate['unscheduled'] || [];
 
   // 면접 배지 수 업데이트
   const todayStr = new Date().toISOString().split('T')[0];
@@ -3864,36 +3882,123 @@ async function loadInterviewRoom() {
   const sbIv = document.getElementById('sbInterview');
   if (sbIv) sbIv.textContent = todayCount || apps.length;
 
+  // 캘린더 시작 월 = 가장 빠른 예정 날짜의 월 (없으면 이번 달)
+  const firstDate = sortedDates.find(d => d >= todayStr) || sortedDates[0];
+  const initialMonth = firstDate ? new Date(firstDate) : new Date();
+  window._ivCalendarYear = initialMonth.getFullYear();
+  window._ivCalendarMonth = initialMonth.getMonth(); // 0-indexed
+
+  c.innerHTML = `
+    <div class="iv-room-layout">
+      <div class="iv-room-left">
+        <div id="ivCalendarWrap"></div>
+        <div id="ivUnscheduledWrap"></div>
+      </div>
+      <div class="iv-room-right" id="ivListWrap"></div>
+    </div>
+  `;
+
+  renderIvCalendar();
+  renderIvUnscheduled(unscheduled);
+  renderIvList(sortedDates, byDate, todayStr);
+}
+
+function ivChangeMonth(delta) {
+  let m = window._ivCalendarMonth + delta;
+  let y = window._ivCalendarYear;
+  if (m < 0) { m = 11; y--; }
+  if (m > 11) { m = 0; y++; }
+  window._ivCalendarMonth = m;
+  window._ivCalendarYear = y;
+  renderIvCalendar();
+}
+
+function renderIvCalendar() {
+  const wrap = document.getElementById('ivCalendarWrap');
+  if (!wrap) return;
+  const byDate = window._ivRoomByDate || {};
+  const year = window._ivCalendarYear, month = window._ivCalendarMonth;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const weekLabels = ['일','월','화','수','목','금','토'];
+
+  let cells = '';
+  for (let i = 0; i < firstDay; i++) cells += `<div class="iv-cal-cell empty"></div>`;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const items = byDate[dateStr] || [];
+    const isToday = dateStr === todayStr;
+    const dow = new Date(year, month, d).getDay();
+    cells += `<div class="iv-cal-cell ${items.length ? 'has-items clickable' : ''} ${isToday ? 'today' : ''}" ${items.length ? `onclick="ivScrollToDate('${dateStr}')"` : ''}>
+      <div class="iv-cal-daynum" style="color:${dow===0?'#A32D2D':dow===6?'#185FA5':'inherit'}">${d}</div>
+      ${items.slice(0,2).map(({app, slot}) => `<div class="iv-cal-chip">${slot ? formatSlotTime(slot.slot_time).replace('오전','오전 ').replace('오후','오후 ') : ''} ${app.name}</div>`).join('')}
+      ${items.length > 2 ? `<div class="iv-cal-more">+${items.length-2}명 더</div>` : ''}
+    </div>`;
+  }
+
+  wrap.innerHTML = `
+    <div class="iv-cal-header">
+      <button class="btn btn-sm" onclick="ivChangeMonth(-1)">‹</button>
+      <div class="iv-cal-title">${year}년 ${month+1}월</div>
+      <button class="btn btn-sm" onclick="ivChangeMonth(1)">›</button>
+    </div>
+    <div class="iv-cal-weekrow">${weekLabels.map(w=>`<div class="iv-cal-weeklabel">${w}</div>`).join('')}</div>
+    <div class="iv-cal-grid">${cells}</div>
+  `;
+}
+
+function ivScrollToDate(dateStr) {
+  const el = document.getElementById('ivdate-' + dateStr);
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderIvUnscheduled(unscheduled) {
+  const wrap = document.getElementById('ivUnscheduledWrap');
+  if (!wrap) return;
+  if (!unscheduled.length) { wrap.innerHTML = ''; return; }
+  wrap.innerHTML = `
+    <div class="iv-room-group" style="margin-top:14px">
+      <div class="iv-room-date">📋 일정 미지정 <span style="font-size:12px;font-weight:400;color:var(--text3)">${unscheduled.length}명</span></div>
+      ${unscheduled.map(({app}) => ivCardHtml(app, null)).join('')}
+    </div>
+  `;
+}
+
+function ivCardHtml(app, slot) {
+  const timeStr = slot ? formatSlotTime(slot.slot_time) : '시간 미정';
+  const roundLabel = app.stage === '2차면접' ? '2차' : '1차';
+  const roundColor = app.stage === '2차면접' ? '#185FA5' : '#534AB7';
+  return `<div class="iv-room-card" onclick="openInterviewSession('${app.id}',false)">
+    <div class="iv-room-time">${timeStr}</div>
+    <div style="flex:1">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="iv-room-name">${app.name}</div>
+        <span style="font-size:11px;background:${roundColor}20;color:${roundColor};padding:2px 8px;border-radius:20px;font-weight:600">${roundLabel}면접</span>
+      </div>
+      <div class="iv-room-job">${app.job_postings?.title||'-'} ${app.job_postings?.department?'· '+app.job_postings.department:''}</div>
+      ${slot?.slot_location?`<div style="font-size:11px;color:#666;margin-top:2px">📍 ${slot.slot_location}</div>`:''}
+    </div>
+    <div class="iv-room-status" style="background:#EEEDFE;color:#534AB7">면접 시작 →</div>
+  </div>`;
+}
+
+function renderIvList(sortedDates, byDate, todayStr) {
+  const wrap = document.getElementById('ivListWrap');
+  if (!wrap) return;
+  if (!sortedDates.length) { wrap.innerHTML = '<div class="empty-state"><div class="icon">📅</div><p>예정된 면접 일정이 없습니다</p></div>'; return; }
+
   let html = '';
   sortedDates.forEach(date => {
     const items = byDate[date];
-    const dateLabel = date === 'unscheduled' ? '📋 일정 미지정'
-      : date === todayStr ? `📅 오늘 ${formatSlotDate(date)}`
-      : `📅 ${formatSlotDate(date)}`;
-
-    html += `<div class="iv-room-group">
+    const dateLabel = date === todayStr ? `📅 오늘 ${formatSlotDate(date)}` : `📅 ${formatSlotDate(date)}`;
+    html += `<div class="iv-room-group" id="ivdate-${date}">
       <div class="iv-room-date">${dateLabel} <span style="font-size:12px;font-weight:400;color:var(--text3)">${items.length}명</span></div>
-      ${items.map(({app, slot}) => {
-        const timeStr = slot ? formatSlotTime(slot.slot_time) : '시간 미정';
-        const roundLabel = app.stage === '2차면접' ? '2차' : '1차';
-        const roundColor = app.stage === '2차면접' ? '#185FA5' : '#534AB7';
-        return `<div class="iv-room-card" onclick="openInterviewSession('${app.id}',false)">
-          <div class="iv-room-time">${timeStr}</div>
-          <div style="flex:1">
-            <div style="display:flex;align-items:center;gap:8px">
-              <div class="iv-room-name">${app.name}</div>
-              <span style="font-size:11px;background:${roundColor}20;color:${roundColor};padding:2px 8px;border-radius:20px;font-weight:600">${roundLabel}면접</span>
-            </div>
-            <div class="iv-room-job">${app.job_postings?.title||'-'} ${app.job_postings?.department?'· '+app.job_postings.department:''}</div>
-            ${slot?.slot_location?`<div style="font-size:11px;color:#666;margin-top:2px">📍 ${slot.slot_location}</div>`:''}
-          </div>
-          <div class="iv-room-status" style="background:#EEEDFE;color:#534AB7">면접 시작 →</div>
-        </div>`;
-      }).join('')}
+      ${items.map(({app, slot}) => ivCardHtml(app, slot)).join('')}
     </div>`;
   });
-
-  c.innerHTML = html;
+  wrap.innerHTML = html;
 }
 
 // ── 면접 세션 (개별 지원자 면접 진행) ─────────────────────────────────────
