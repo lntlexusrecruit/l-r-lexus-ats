@@ -125,7 +125,7 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .iv-room-status{margin-left:auto;font-size:12px;padding:4px 12px;border-radius:20px;font-weight:600;white-space:nowrap}
 
 /* 면접 진행 - 캘린더 레이아웃 */
-.iv-room-layout{display:grid;grid-template-columns:3fr 2fr;gap:20px;align-items:start}
+.iv-room-layout{display:grid;grid-template-columns:2fr 3fr;gap:20px;align-items:start}
 .iv-room-left{position:sticky;top:0}
 .iv-room-right{min-width:0}
 .iv-unscheduled-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -133,8 +133,8 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .iv-cal-title{font-size:14px;font-weight:700;color:var(--text)}
 .iv-cal-weekrow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin-bottom:4px}
 .iv-cal-weeklabel{text-align:center;font-size:11px;color:var(--text3);padding:4px 0}
-.iv-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:88px;gap:4px}
-.iv-cal-cell{height:88px;min-width:0;overflow:hidden;border-radius:var(--rxs);padding:5px;background:var(--surface);border:0.5px solid var(--border);display:flex;flex-direction:column}
+.iv-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:100px;gap:3px}
+.iv-cal-cell{height:100px;min-width:0;overflow:hidden;border-radius:var(--rxs);padding:4px;background:var(--surface);border:0.5px solid var(--border);display:flex;flex-direction:column}
 .iv-cal-cell.empty{background:transparent;border:none}
 .iv-cal-cell.today{border:1.5px solid var(--accent)}
 .iv-cal-cell.has-items{background:#EEEDFE}
