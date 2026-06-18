@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./chart.umd.min.js"></script>
+<script src="./chartjs-plugin-datalabels.min.js"></script>
 <script src="./emailjs.min.js"></script>
 <script src="./pizzip.js"></script>
 <script src="./docxtemplater.js"></script>
@@ -193,6 +194,8 @@ body{font-family:'Pretendard',-apple-system,sans-serif;background:var(--bg);colo
 .chart-card .chart-canvas-wrap{position:relative;flex:1;min-height:0}
 .chart-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .chart-grid-2 .chart-card{height:320px}
+.chart-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.chart-grid-3 .chart-card{height:280px}
 .chart-card.full{height:auto}
 .chart-card.tall{height:380px}
 
@@ -2104,6 +2107,7 @@ async function deleteSelected() {
 
 // ── 통계 대시보드 ─────────────────────────────────────────
 let _statsCharts = {}; // Chart.js 인스턴스 보관 (재렌더 시 destroy용)
+let allEducation = [], allWorkExperience = [];
 
 function destroyStatsCharts() {
   Object.values(_statsCharts).forEach(ch => { try { ch.destroy(); } catch(e){} });
@@ -2128,17 +2132,47 @@ async function loadStats() {
     o.value = d; o.textContent = d; deptSel.appendChild(o);
   });
 
-  // 단계 이력 로드 (퍼널/추이 분석용)
+  // 단계 이력 + 학력 + 경력 데이터 병렬 로드
   try {
-    const { data, error } = await sb.from('application_stage_history').select('*').order('changed_at', { ascending: true });
-    if (error) throw error;
-    allStageHistory = data || [];
+    const [histRes, eduRes, workRes] = await Promise.all([
+      sb.from('application_stage_history').select('*').order('changed_at', { ascending: true }),
+      sb.from('education').select('*').order('sort_order', { ascending: true }),
+      sb.from('work_experience').select('*').order('sort_order', { ascending: true })
+    ]);
+    allStageHistory = histRes.data || [];
+    allEducation = eduRes.data || [];
+    allWorkExperience = workRes.data || [];
   } catch (e) {
-    console.error('stage history load error', e);
-    allStageHistory = [];
+    console.error('stats data load error', e);
+    allStageHistory = []; allEducation = []; allWorkExperience = [];
   }
 
   renderStats();
+}
+
+// 학력 등급을 비교 가능한 순위로 변환 (높을수록 상위 학력)
+const DEGREE_RANK = { '고졸':1, '전문대졸':2, '초대졸':2, '대졸':3, '학사':3, '석사':4, '박사':5 };
+
+function getFinalDegree(applicationId) {
+  const rows = allEducation.filter(e => e.application_id === applicationId);
+  if (!rows.length) return null;
+  // sort_order가 가장 낮은 게 최신 학력이라는 입력 관례를 따르되,
+  // degree rank가 더 높은 게 있으면 그걸 최종학력으로 채택 (안전장치)
+  let best = rows[0];
+  rows.forEach(r => {
+    const rb = DEGREE_RANK[best.degree] || 0;
+    const rr = DEGREE_RANK[r.degree] || 0;
+    if (rr > rb) best = r;
+  });
+  return best.degree || null;
+}
+
+function getExperienceLevel(applicationId) {
+  const rows = allWorkExperience.filter(w => w.application_id === applicationId);
+  if (!rows.length) return '정보없음';
+  if (rows.length === 1 && rows[0].is_no_experience) return '신입';
+  const real = rows.filter(r => !r.is_no_experience);
+  return real.length ? '경력' : '신입';
 }
 
 function renderStats() {
@@ -2169,27 +2203,15 @@ function renderStats() {
 
   // ── 핵심 지표 계산 ──
   const finalPass = apps.filter(a => a.stage === '최종합격').length;
-  const rejected = apps.filter(a => a.stage === '불합격').length;
-  const inInterview = apps.filter(a => ['1차면접','2차면접'].includes(a.stage)).length;
   const interviewRate = total ? Math.round((apps.filter(a=>['1차면접','2차면접','최종합격'].includes(a.stage)).length / total) * 100) : 0;
   const passRate = total ? Math.round((finalPass / total) * 100) : 0;
 
   // ── 파이프라인(퍼널) 단계별 인원 ──
-  const byStage = {};
-  PIPELINE.forEach(p => byStage[p.key] = 0);
-  apps.forEach(a => { const k = a.stage || '지원완료'; if (byStage[k] !== undefined) byStage[k]++; });
-
-  // 누적 퍼널: 각 단계 "도달" 인원 = 해당 단계 이상 진행된 사람 수 (불합격 제외하고 진행 단계 누적)
   const funnelOrder = ['지원완료','관리자검토','1차면접','2차면접','최종합격'];
   const stageRank = Object.fromEntries(funnelOrder.map((k,i)=>[k,i]));
   const funnelCounts = funnelOrder.map(stageKey => {
     const rank = stageRank[stageKey];
-    return apps.filter(a => {
-      const ar = stageRank[a.stage];
-      // 불합격된 사람도 이력상 도달했던 단계까지는 카운트하고 싶지만,
-      // 단순화를 위해 현재 stage 기준으로 도달 여부만 본다 (불합격 제외)
-      return ar !== undefined && ar >= rank;
-    }).length;
+    return apps.filter(a => { const ar = stageRank[a.stage]; return ar !== undefined && ar >= rank; }).length;
   });
 
   // ── 인구통계 ──
@@ -2215,13 +2237,48 @@ function renderStats() {
   const byDept = {};
   apps.forEach(a => { const d = a.job_postings?.department || '미분류'; byDept[d] = (byDept[d]||0) + 1; });
 
-  // 부서별 합격률 (지원자 5명 이상인 부서만)
+  // 부서별 합격률 (지원자 3명 이상인 부서만)
   const deptPassRate = {};
   Object.keys(byDept).forEach(d => {
     const deptApps = apps.filter(a => (a.job_postings?.department || '미분류') === d);
     if (deptApps.length >= 3) {
       deptPassRate[d] = Math.round((deptApps.filter(a=>a.stage==='최종합격').length / deptApps.length) * 100);
     }
+  });
+
+  // ── 학력 분포 (전체 지원자) ──
+  const byDegree = {};
+  apps.forEach(a => { const d = getFinalDegree(a.id) || '미입력'; byDegree[d] = (byDegree[d]||0) + 1; });
+
+  // ── 합격자 학력/경력 분포 ──
+  const passedApps = apps.filter(a => a.stage === '최종합격');
+  const passedByDegree = {};
+  passedApps.forEach(a => { const d = getFinalDegree(a.id) || '미입력'; passedByDegree[d] = (passedByDegree[d]||0) + 1; });
+  const passedByExp = {};
+  passedApps.forEach(a => { const e = getExperienceLevel(a.id); passedByExp[e] = (passedByExp[e]||0) + 1; });
+
+  // ── 채널별 상세 퍼널 (지원경로 × 단계) ──
+  const channelFunnel = {};
+  apps.forEach(a => {
+    const sources = a.apply_source && a.apply_source.length ? a.apply_source : ['미입력'];
+    sources.forEach(s => {
+      if (!channelFunnel[s]) channelFunnel[s] = { total:0, interview:0, passed:0 };
+      channelFunnel[s].total++;
+      if (['1차면접','2차면접','최종합격'].includes(a.stage)) channelFunnel[s].interview++;
+      if (a.stage === '최종합격') channelFunnel[s].passed++;
+    });
+  });
+
+  // ── 성별 × 부서 교차분석 ──
+  const genders = [...new Set(apps.map(a => a.gender || '미입력'))];
+  const deptList = Object.keys(byDept);
+  const genderDeptMatrix = {}; // { dept: { gender: count } }
+  deptList.forEach(d => { genderDeptMatrix[d] = {}; genders.forEach(g => genderDeptMatrix[d][g] = 0); });
+  apps.forEach(a => {
+    const d = a.job_postings?.department || '미분류';
+    const g = a.gender || '미입력';
+    if (!genderDeptMatrix[d]) genderDeptMatrix[d] = {};
+    genderDeptMatrix[d][g] = (genderDeptMatrix[d][g]||0) + 1;
   });
 
   // ── 월별 지원자 추이 (최근 12개월) ──
@@ -2239,28 +2296,25 @@ function renderStats() {
     if (monthMap[key]) monthMap[key].count++;
   });
 
-  // ── 리드타임 (stage history 기반, 데이터 있으면 계산) ──
-  const leadTimes = []; // { applyToFinal, applyToInterview }
+  // ── 리드타임 (stage history 기반) ──
+  const leadTimes = [];
   appIds.forEach(id => {
     const hist = allStageHistory.filter(h => h.application_id === id).sort((a,b)=>new Date(a.changed_at)-new Date(b.changed_at));
     if (!hist.length) return;
     const applyTime = hist[0].changed_at;
     const finalRow = hist.find(h => h.to_stage === '최종합격');
-    const interviewRow = hist.find(h => h.to_stage === '1차면접');
-    if (finalRow) leadTimes.push({ type: 'final', days: Math.round((new Date(finalRow.changed_at) - new Date(applyTime)) / 86400000) });
-    if (interviewRow) leadTimes.push({ type: 'interview', days: Math.round((new Date(interviewRow.changed_at) - new Date(applyTime)) / 86400000) });
+    if (finalRow) leadTimes.push(Math.round((new Date(finalRow.changed_at) - new Date(applyTime)) / 86400000));
   });
-  const finalLeadTimes = leadTimes.filter(l=>l.type==='final').map(l=>l.days).filter(d=>d>=0);
+  const finalLeadTimes = leadTimes.filter(d=>d>=0);
   const avgFinalLead = finalLeadTimes.length ? Math.round(finalLeadTimes.reduce((a,b)=>a+b,0)/finalLeadTimes.length) : null;
   const historyDays = allStageHistory.length ? Math.round((Date.now() - new Date(allStageHistory[0].changed_at).getTime()) / 86400000) : 0;
 
-  // ── 색상 토큰 (기존 디자인 시스템과 통일) ──
+  // ── 색상 토큰 ──
   const palette = ['#A8C5E8','#B5D5C5','#F5C6A0','#C5B8E8','#F0B8C8','#B8D8E8','#D4C5A9','#9E9C97'];
   const stageColorMap = { '지원완료':'#888780','관리자검토':'#B25C00','1차면접':'#534AB7','2차면접':'#185FA5','최종합격':'#3B6D11','불합격':'#A32D2D' };
 
-  function statCard2(val, label, color, delta) {
-    const deltaHtml = delta ? `<div class="stat-delta ${delta.dir}">${delta.text}</div>` : '';
-    return `<div class="stat-card2"><div class="stat-val2" style="color:${color}">${val}</div><div class="stat-label2">${label}</div>${deltaHtml}</div>`;
+  function statCard2(val, label, color) {
+    return `<div class="stat-card2"><div class="stat-val2" style="color:${color}">${val}</div><div class="stat-label2">${label}</div></div>`;
   }
 
   function chartCard(title, sub, canvasId, sizeClass='') {
@@ -2290,6 +2344,23 @@ function renderStats() {
     }).join('') + `</div>`;
   }
 
+  function channelTableHtml() {
+    const rows = Object.entries(channelFunnel).sort((a,b)=>b[1].total-a[1].total);
+    return `<div class="table-wrap"><table class="table">
+      <thead><tr><th>채널</th><th>지원자</th><th>면접 진행</th><th>면접 전환율</th><th>최종 합격</th><th>합격률</th></tr></thead>
+      <tbody>${rows.map(([name, v]) => `
+        <tr>
+          <td style="font-weight:500">${name}</td>
+          <td>${v.total}명</td>
+          <td>${v.interview}명</td>
+          <td>${v.total ? Math.round(v.interview/v.total*100) : 0}%</td>
+          <td>${v.passed}명</td>
+          <td style="color:var(--t600);font-weight:600">${v.total ? Math.round(v.passed/v.total*100) : 0}%</td>
+        </tr>`).join('')}
+      </tbody>
+    </table></div>`;
+  }
+
   c.innerHTML = `
     <div class="stats-section-label">핵심 지표</div>
     <div class="stats-grid" style="margin-bottom:8px">
@@ -2307,20 +2378,35 @@ function renderStats() {
     </div>
 
     <div class="stats-section-label">분포 분석</div>
-    <div class="chart-grid-2">
+    <div class="chart-grid-3">
       ${chartCard('지원 경로별', null, 'chartSource')}
       ${chartCard('성별 분포', null, 'chartGender')}
       ${chartCard('나이대 분포', null, 'chartAge')}
-      ${chartCard('부서별 지원자', null, 'chartDept')}
+      ${chartCard('지원자 최종학력', null, 'chartDegree')}
+      ${chartCard('합격자 최종학력', '최종합격 ' + passedApps.length + '명 기준', 'chartPassedDegree')}
+      ${chartCard('합격자 경력 여부', '최종합격 ' + passedApps.length + '명 기준', 'chartPassedExp')}
     </div>
 
-    <div class="stats-section-label">추이 &amp; 비교</div>
+    <div class="stats-section-label">부서별 현황</div>
     <div class="chart-grid-2">
-      ${chartCard('월별 지원자 추이', '최근 12개월', 'chartTrend')}
+      ${chartCard('부서별 지원자 수', null, 'chartDept')}
       ${Object.keys(deptPassRate).length ? chartCard('부서별 최종 합격률', '지원자 3명 이상 부서만 표시', 'chartDeptPass') : '<div class="chart-card" style="align-items:center;justify-content:center;color:var(--text3);font-size:12px">부서별 합격률을 보려면 부서당 3명 이상 지원자가 필요합니다</div>'}
     </div>
 
-    ${!jobId ? `<div class="stats-section-label">공고별 지원자</div>${chartCard('채용 공고별 지원자 수', null, 'chartByJob', 'tall')}` : ''}
+    <div class="chart-card full">
+      <div class="chart-card-title">성별 × 부서 분포</div>
+      <div class="chart-card-sub">부서별 지원자 중 성별 구성</div>
+      <div class="chart-canvas-wrap" style="min-height:280px"><canvas id="chartGenderDept"></canvas></div>
+    </div>
+
+    <div class="stats-section-label">지원 경로별 상세 (면접·합격 전환)</div>
+    ${channelTableHtml()}
+
+    <div class="stats-section-label">추이 &amp; 공고별 비교</div>
+    <div class="chart-grid-2">
+      ${chartCard('월별 지원자 추이', '최근 12개월', 'chartTrend')}
+      ${!jobId ? chartCard('채용 공고별 지원자 수', null, 'chartByJob') : '<div class="chart-card" style="align-items:center;justify-content:center;color:var(--text3);font-size:12px">특정 공고 필터 적용 중</div>'}
+    </div>
 
     <div class="stats-section-label">리드타임 (지원 → 최종합격)</div>
     ${avgFinalLead !== null ? `
@@ -2336,28 +2422,98 @@ function renderStats() {
   const fontFamily = "'Pretendard', sans-serif";
   Chart.defaults.font.family = fontFamily;
   Chart.defaults.color = '#5F5E5A';
+  const hasDatalabels = typeof ChartDataLabels !== 'undefined';
+  if (hasDatalabels) Chart.register(ChartDataLabels);
 
   function donut(canvasId, dataObj, colors) {
     const entries = Object.entries(dataObj).filter(([,v])=>v>0);
     const ctx = document.getElementById(canvasId);
     if (!ctx) return;
+    const sum = entries.reduce((s,[,v])=>s+v, 0);
     _statsCharts[canvasId] = new Chart(ctx, {
       type: 'doughnut',
       data: {
         labels: entries.map(([k])=>k),
-        datasets: [{ data: entries.map(([,v])=>v), backgroundColor: colors, borderWidth: 0 }]
+        datasets: [{ data: entries.map(([,v])=>v), backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }]
       },
       options: {
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } } }
-      }
+        layout: { padding: 12 },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 }, padding: 8 } },
+          datalabels: hasDatalabels ? {
+            color: '#fff',
+            font: { weight: '700', size: 13 },
+            formatter: (value) => sum ? Math.round(value/sum*100) + '%' : '',
+            display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0
+          } : undefined
+        }
+      },
+      plugins: hasDatalabels ? [ChartDataLabels] : []
     });
   }
 
   donut('chartSource', bySource, palette);
   donut('chartGender', byGender, ['#A8C5E8','#F0B8C8','#C8C8C8']);
   donut('chartAge', byAge, palette);
-  donut('chartDept', byDept, palette);
+  donut('chartDegree', byDegree, palette.slice().reverse());
+  donut('chartPassedDegree', passedByDegree, palette.slice().reverse());
+  donut('chartPassedExp', passedByExp, ['#B5D5C5','#F5C6A0','#C5B8E8']);
+
+  // 부서별 지원자 수 - 바차트
+  const deptCtx = document.getElementById('chartDept');
+  if (deptCtx) {
+    const sorted = Object.entries(byDept).sort((a,b)=>b[1]-a[1]);
+    _statsCharts.chartDept = new Chart(deptCtx, {
+      type: 'bar',
+      data: { labels: sorted.map(([k])=>k), datasets: [{ label: '지원자 수', data: sorted.map(([,v])=>v), backgroundColor: '#A8C5E8', borderRadius: 6 }] },
+      options: {
+        indexAxis: 'y', maintainAspectRatio: false,
+        plugins: { legend: { display: false }, datalabels: hasDatalabels ? { anchor:'end', align:'right', color:'#5F5E5A', font:{size:11,weight:'600'} } : undefined },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
+      },
+      plugins: hasDatalabels ? [ChartDataLabels] : []
+    });
+  }
+
+  // 부서별 합격률 바차트
+  const deptPassCtx = document.getElementById('chartDeptPass');
+  if (deptPassCtx && Object.keys(deptPassRate).length) {
+    _statsCharts.chartDeptPass = new Chart(deptPassCtx, {
+      type: 'bar',
+      data: { labels: Object.keys(deptPassRate), datasets: [{ label: '최종 합격률(%)', data: Object.values(deptPassRate), backgroundColor: '#B5D5C5', borderRadius: 6 }] },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false }, datalabels: hasDatalabels ? { anchor:'end', align:'top', color:'#27500A', font:{size:11,weight:'700'}, formatter:v=>v+'%' } : undefined },
+        scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } } }
+      },
+      plugins: hasDatalabels ? [ChartDataLabels] : []
+    });
+  }
+
+  // 성별 x 부서 누적 바차트
+  const gdCtx = document.getElementById('chartGenderDept');
+  if (gdCtx) {
+    const genderColors = { '남':'#A8C5E8', '여':'#F0B8C8', '미입력':'#C8C8C8' };
+    _statsCharts.chartGenderDept = new Chart(gdCtx, {
+      type: 'bar',
+      data: {
+        labels: deptList,
+        datasets: genders.map(g => ({
+          label: g,
+          data: deptList.map(d => genderDeptMatrix[d][g] || 0),
+          backgroundColor: genderColors[g] || '#9E9C97',
+          borderRadius: 4
+        }))
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' }, datalabels: hasDatalabels ? { color:'#fff', font:{size:10,weight:'600'}, formatter:v=>v>0?v:'' } : undefined },
+        scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } }
+      },
+      plugins: hasDatalabels ? [ChartDataLabels] : []
+    });
+  }
 
   // 월별 추이 라인차트
   const trendCtx = document.getElementById('chartTrend');
@@ -2374,25 +2530,8 @@ function renderStats() {
       },
       options: {
         maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        plugins: { legend: { display: false }, datalabels: hasDatalabels ? { display:false } : undefined },
         scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-      }
-    });
-  }
-
-  // 부서별 합격률 바차트
-  const deptPassCtx = document.getElementById('chartDeptPass');
-  if (deptPassCtx && Object.keys(deptPassRate).length) {
-    _statsCharts.chartDeptPass = new Chart(deptPassCtx, {
-      type: 'bar',
-      data: {
-        labels: Object.keys(deptPassRate),
-        datasets: [{ label: '최종 합격률(%)', data: Object.values(deptPassRate), backgroundColor: '#B5D5C5', borderRadius: 6 }]
-      },
-      options: {
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v+'%' } } }
       }
     });
   }
@@ -2403,19 +2542,17 @@ function renderStats() {
     const sorted = Object.entries(byJob).sort((a,b)=>b[1]-a[1]);
     _statsCharts.chartByJob = new Chart(byJobCtx, {
       type: 'bar',
-      data: {
-        labels: sorted.map(([k])=>k),
-        datasets: [{ label: '지원자 수', data: sorted.map(([,v])=>v), backgroundColor: '#A8C5E8', borderRadius: 6 }]
-      },
+      data: { labels: sorted.map(([k])=>k), datasets: [{ label: '지원자 수', data: sorted.map(([,v])=>v), backgroundColor: '#A8C5E8', borderRadius: 6 }] },
       options: {
-        indexAxis: 'y',
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
+        indexAxis: 'y', maintainAspectRatio: false,
+        plugins: { legend: { display: false }, datalabels: hasDatalabels ? { anchor:'end', align:'right', color:'#5F5E5A', font:{size:11,weight:'600'} } : undefined },
         scales: { x: { beginAtZero: true, ticks: { precision: 0 } } }
-      }
+      },
+      plugins: hasDatalabels ? [ChartDataLabels] : []
     });
   }
 }
+
 
 
 function hideLoading(){document.getElementById('loadingOverlay')?.classList.add('hidden');}
