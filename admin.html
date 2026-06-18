@@ -369,11 +369,12 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
   <div class="app">
     <button class="sb-toggle-btn" id="sbToggleBtn" onclick="toggleSidebar()">◀</button>
     <aside class="sidebar" id="sidebar">
-      <div class="sb-logo" style="font-family:'Pretendard',sans-serif;font-weight:600;font-size:14px;letter-spacing:-0.3px">엘앤티렉서스(주)</div>
+      <div class="sb-logo" style="font-family:'Pretendard',sans-serif;font-weight:600;font-size:14px;letter-spacing:-0.3px;cursor:pointer" onclick="showPage('home', document.getElementById('sbHome'))">엘앤티렉서스(주)</div>
       <nav class="sb-nav">
+        <button class="sb-link active" id="sbHome" onclick="showPage('home',this)">⌂ 홈</button>
         <div class="sb-label" id="recruitMenuLabel">채용 관리</div>
         <div id="recruitMenu">
-          <button class="sb-link active" id="sbDashboard" onclick="showPage('dashboard',this)">⊡ 공고 현황 <span class="sb-badge" id="sbTotal">0</span></button>
+          <button class="sb-link" id="sbDashboard" onclick="showPage('dashboard',this)">⊡ 공고 현황 <span class="sb-badge" id="sbTotal">0</span></button>
           <button class="sb-link" onclick="showPage('interviewroom',this)">🎤 면접 진행 <span class="sb-badge" id="sbInterview">0</span></button>
           <button class="sb-link" onclick="showPage('jobs',this)">⊞ 채용 공고 <span class="sb-badge" id="sbJobs">0</span></button>
           <div id="superOnlyMenu" class="hidden">
@@ -404,9 +405,20 @@ const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
     </aside>
 
     <div class="main" id="mainWrap">
+      <!-- 홈 (할 일 요약) -->
+      <div id="pageHome">
+        <div class="topbar">
+          <div class="topbar-title">홈</div>
+          <button class="btn btn-sm" onclick="loadHome()">↻ 새로고침</button>
+        </div>
+        <div class="content" id="homeContent">
+          <div class="loading"><div class="spinner"></div>불러오는 중...</div>
+        </div>
+      </div>
+
       <!-- 파이프라인 -->
       <!-- 공고 대시보드 (기본 홈) -->
-      <div id="pageDashboard">
+      <div id="pageDashboard" class="hidden">
         <div class="topbar">
           <div class="topbar-title">공고 현황</div>
           <button class="btn btn-sm" id="refreshDashBtn" onclick="loadDashboard()">↻ 새로고침</button>
@@ -987,10 +999,241 @@ async function showApp() {
   const interviewCount = allApps.filter(a => ['1차면접','2차면접'].includes(a.stage)).length;
   const sbIv = document.getElementById('sbInterview');
   if (sbIv) sbIv.textContent = interviewCount || '';
-  // 첫 화면은 대시보드
-  showPage('dashboard', document.getElementById('sbDashboard'));
-  await loadDashboard();
+  // 첫 화면은 홈
+  showPage('home', document.getElementById('sbHome'));
 }
+
+// ── 홈 (할 일 요약) ──────────────────────────────────────
+let allInterviewSlots = [], allInterviewSelections = [], allInterviewEvaluations = [];
+let allJobInterviewers1 = [], allJobInterviewers2 = [];
+let allDispatchJobInterviewers = [], allDispatchPostingsHome = [], allDispatchCandidatesHome = [];
+
+async function loadHome() {
+  const c = document.getElementById('homeContent');
+  c.innerHTML = '<div class="loading"><div class="spinner"></div>불러오는 중...</div>';
+
+  try {
+    const [slotsRes, selRes, evalRes, ji1Res, ji2Res, djiRes, dpRes, dcRes] = await Promise.all([
+      sb.from('interview_slots').select('*'),
+      sb.from('interview_selections').select('*'),
+      sb.from('interview_evaluations').select('*'),
+      sb.from('job_interviewers').select('*'),
+      sb.from('job_interviewers_2nd').select('*'),
+      sb.from('dispatch_job_interviewers').select('*'),
+      sb.from('dispatch_postings').select('*'),
+      sb.from('dispatch_candidates').select('*')
+    ]);
+    allInterviewSlots = slotsRes.data || [];
+    allInterviewSelections = selRes.data || [];
+    allInterviewEvaluations = evalRes.data || [];
+    allJobInterviewers1 = ji1Res.data || [];
+    allJobInterviewers2 = ji2Res.data || [];
+    allDispatchJobInterviewers = djiRes.data || [];
+    allDispatchPostingsHome = dpRes.data || [];
+    allDispatchCandidatesHome = dcRes.data || [];
+  } catch (e) {
+    console.error('home data load error', e);
+    c.innerHTML = '<div class="empty-stats">홈 데이터를 불러오지 못했습니다. 새로고침 해주세요.</div>';
+    return;
+  }
+
+  renderHome();
+}
+
+// 일반 채용 공고 기준 할 일 4종 계산
+function computeTodos(jobIds) {
+  const jobIdSet = new Set(jobIds);
+  const apps = allApps.filter(a => !a.is_draft && jobIdSet.has(a.job_posting_id));
+
+  const reviewNeeded = apps.filter(a => (a.stage || '지원완료') === '지원완료');
+
+  const selectedAppIds = new Set(allInterviewSelections.map(s => s.application_id));
+  const waitingSchedule = apps.filter(a => a.stage === '관리자검토' && !selectedAppIds.has(a.id));
+
+  const todayStr = new Date().toISOString().slice(0,10);
+  const slotById = Object.fromEntries(allInterviewSlots.map(s => [s.id, s]));
+  const upcomingInterviews = allInterviewSelections.filter(sel => {
+    const app = allApps.find(a => a.id === sel.application_id);
+    if (!app || !jobIdSet.has(app.job_posting_id)) return false;
+    const slot = slotById[sel.slot_id];
+    return slot && slot.slot_date >= todayStr;
+  });
+
+  const evalKey = (id, round) => id + '_' + round;
+  const evaluatedSet = new Set(allInterviewEvaluations.filter(e=>e.application_id).map(e => evalKey(e.application_id, e.interview_round)));
+  const decisionNeeded = apps.filter(a => {
+    if (a.stage === '1차면접') return !evaluatedSet.has(evalKey(a.id, 1));
+    if (a.stage === '2차면접') return !evaluatedSet.has(evalKey(a.id, 2));
+    return false;
+  });
+
+  return { reviewNeeded, waitingSchedule, upcomingInterviews, decisionNeeded, totalApps: apps.length };
+}
+
+// 파견직 공고 기준 할 일 4종 계산 (일반 채용과 stage 키, 컬럼명이 다름에 주의)
+function computeDispatchTodos(postingIds) {
+  const postingIdSet = new Set(postingIds);
+  const cands = allDispatchCandidatesHome.filter(c => postingIdSet.has(c.dispatch_posting_id));
+
+  const reviewNeeded = cands.filter(c => (c.stage || '지원') === '지원');
+
+  const selectedCandIds = new Set(allInterviewSelections.filter(s=>s.dispatch_candidate_id).map(s => s.dispatch_candidate_id));
+  const waitingSchedule = cands.filter(c => c.stage === '관리자검토' && !selectedCandIds.has(c.id));
+
+  const todayStr = new Date().toISOString().slice(0,10);
+  const slotById = Object.fromEntries(allInterviewSlots.map(s => [s.id, s]));
+  const upcomingInterviews = allInterviewSelections.filter(sel => {
+    if (!sel.dispatch_candidate_id) return false;
+    const cand = allDispatchCandidatesHome.find(c => c.id === sel.dispatch_candidate_id);
+    if (!cand || !postingIdSet.has(cand.dispatch_posting_id)) return false;
+    const slot = slotById[sel.slot_id];
+    return slot && slot.slot_date >= todayStr;
+  });
+
+  const evaluatedCandSet = new Set(allInterviewEvaluations.filter(e=>e.dispatch_candidate_id).map(e => e.dispatch_candidate_id));
+  const decisionNeeded = cands.filter(c => c.stage === '1차면접' && !evaluatedCandSet.has(c.id));
+
+  return { reviewNeeded, waitingSchedule, upcomingInterviews, decisionNeeded, totalApps: cands.length };
+}
+
+function todoCardHtml(icon, count, label, color) {
+  return `<div class="stat-card2" style="text-align:left;display:flex;align-items:center;gap:14px">
+    <div style="font-size:26px;line-height:1;flex-shrink:0">${icon}</div>
+    <div style="flex:1">
+      <div style="font-size:24px;font-weight:600;color:${color};line-height:1.1">${count}<span style="font-size:13px;font-weight:400;color:var(--text3)">건</span></div>
+      <div style="font-size:12px;color:var(--text2);margin-top:2px">${label}</div>
+    </div>
+  </div>`;
+}
+
+function todoSectionHtml(title, subLabel, todos) {
+  const { reviewNeeded, waitingSchedule, upcomingInterviews, decisionNeeded } = todos;
+  return `
+    <div class="stats-section-label">${title}</div>
+    ${subLabel ? `<div style="font-size:12px;color:var(--text3);margin-bottom:10px">${subLabel}</div>` : ''}
+    <div class="stats-grid">
+      ${todoCardHtml('📋', reviewNeeded.length, '이력서 검토 필요', '#B25C00')}
+      ${todoCardHtml('🗓️', waitingSchedule.length, '면접 일정 선택 대기', '#534AB7')}
+      ${todoCardHtml('✅', upcomingInterviews.length, '예정된 면접', '#185FA5')}
+      ${todoCardHtml('⚖️', decisionNeeded.length, '합/불 결정 필요', '#A32D2D')}
+    </div>
+    ${renderTodoLists(todos)}
+  `;
+}
+
+function jobTitleOf(item) {
+  if (item._isDispatch) {
+    const posting = allDispatchPostingsHome.find(p => p.id === item.dispatch_posting_id);
+    return posting?.title ? '🚌 ' + posting.title : '';
+  }
+  return item.job_postings?.title || '';
+}
+
+function renderTodoLists(todos) {
+  const { reviewNeeded, waitingSchedule, upcomingInterviews, decisionNeeded } = todos;
+
+  function listBlock(title, items, renderRow) {
+    if (!items.length) return '';
+    return `<div class="chart-card full" style="margin-top:12px">
+      <div class="chart-card-title">${title} (${items.length})</div>
+      <div class="table-wrap"><table class="table">${items.slice(0,8).map(renderRow).join('')}</table></div>
+      ${items.length > 8 ? `<div style="font-size:11px;color:var(--text3);margin-top:8px">외 ${items.length-8}건 더 있음</div>` : ''}
+    </div>`;
+  }
+
+  const reviewHtml = listBlock('이력서 검토 대기 목록', reviewNeeded, a => `<tr><td style="font-weight:500">${a.name}</td><td style="color:var(--text3)">${jobTitleOf(a)}</td><td style="color:var(--text3);font-size:12px">${a.submitted_at||a.created_at ? new Date(a.submitted_at||a.created_at).toLocaleDateString() : ''}</td></tr>`);
+
+  const waitingHtml = listBlock('면접 일정 선택 대기 목록', waitingSchedule, a => `<tr><td style="font-weight:500">${a.name}</td><td style="color:var(--text3)">${jobTitleOf(a)}</td></tr>`);
+
+  const slotById = Object.fromEntries(allInterviewSlots.map(s => [s.id, s]));
+  const upcomingHtml = listBlock('예정된 면접 목록', upcomingInterviews.slice().sort((a,b)=>{
+    const sa = slotById[a.slot_id], sb2 = slotById[b.slot_id];
+    return (sa?.slot_date||'').localeCompare(sb2?.slot_date||'');
+  }), sel => {
+    const item = sel._isDispatch
+      ? allDispatchCandidatesHome.find(c => c.id === sel.dispatch_candidate_id)
+      : allApps.find(a => a.id === sel.application_id);
+    const slot = slotById[sel.slot_id];
+    const itemTagged = item ? Object.assign({}, item, { _isDispatch: sel._isDispatch }) : null;
+    return `<tr><td style="font-weight:500">${item?.name||'-'}</td><td style="color:var(--text3)">${itemTagged?jobTitleOf(itemTagged):''}</td><td>${slot?.slot_date||''} ${slot?.slot_time||''}</td></tr>`;
+  });
+
+  const decisionHtml = listBlock('합/불 결정 대기 목록', decisionNeeded, a => `<tr><td style="font-weight:500">${a.name}</td><td style="color:var(--text3)">${jobTitleOf(a)}</td><td style="color:var(--text3)">${a.stage}</td></tr>`);
+
+  return reviewHtml + waitingHtml + upcomingHtml + decisionHtml;
+}
+
+function renderHome() {
+  const c = document.getElementById('homeContent');
+  const isSuper = adminProfile?.role === 'superadmin';
+  const myName = adminProfile?.name || currentAdmin?.email?.split('@')[0] || '관리자';
+
+  let html = `<div style="font-size:18px;font-weight:300;color:var(--text);margin-bottom:4px">안녕하세요, ${myName}님 👋</div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:20px">오늘 처리해야 할 일들을 한눈에 확인하세요.</div>`;
+
+  if (isSuper) {
+    // 전체 공고 기준 (일반 + 파견직 합산)
+    const allJobIds = allJobs.map(j => j.id);
+    const allPostingIds = allDispatchPostingsHome.map(p => p.id);
+    const t1 = computeTodos(allJobIds);
+    const t2 = computeDispatchTodos(allPostingIds);
+    const merged = mergeTodos(t1, t2);
+    html += todoSectionHtml('전체 공고 기준 (일반 + 파견직)', `일반 ${allJobs.length}개 · 파견 ${allDispatchPostingsHome.length}개 공고`, merged);
+
+    // 본인이 면접관으로 배정된 공고
+    const myJobIds = myAssignedJobIds();
+    const myPostingIds = myAssignedDispatchPostingIds();
+    if (myJobIds.length || myPostingIds.length) {
+      const mt1 = computeTodos(myJobIds);
+      const mt2 = computeDispatchTodos(myPostingIds);
+      const myMerged = mergeTodos(mt1, mt2);
+      const titles = [...allJobs.filter(j=>myJobIds.includes(j.id)).map(j=>j.title), ...allDispatchPostingsHome.filter(p=>myPostingIds.includes(p.id)).map(p=>p.title)].join(', ');
+      html += todoSectionHtml('내가 면접관으로 배정된 공고', titles, myMerged);
+    } else {
+      html += `<div class="stats-section-label">내가 면접관으로 배정된 공고</div>
+        <div class="empty-stats">현재 면접관으로 배정된 공고가 없습니다.</div>`;
+    }
+  } else {
+    const myJobIds = myAssignedJobIds();
+    const myPostingIds = myAssignedDispatchPostingIds();
+    if (myJobIds.length || myPostingIds.length) {
+      const mt1 = computeTodos(myJobIds);
+      const mt2 = computeDispatchTodos(myPostingIds);
+      const myMerged = mergeTodos(mt1, mt2);
+      const titles = [...allJobs.filter(j=>myJobIds.includes(j.id)).map(j=>j.title), ...allDispatchPostingsHome.filter(p=>myPostingIds.includes(p.id)).map(p=>p.title)].join(', ');
+      html += todoSectionHtml('내가 면접관으로 배정된 공고', titles, myMerged);
+    } else {
+      html += `<div class="empty-stats">현재 면접관으로 배정된 공고가 없습니다. 관리자에게 문의해주세요.</div>`;
+    }
+  }
+
+  c.innerHTML = html;
+}
+
+function myAssignedJobIds() {
+  const ids1 = allJobInterviewers1.filter(ji => ji.admin_id === currentAdmin.id).map(ji => ji.job_id);
+  const ids2 = allJobInterviewers2.filter(ji => ji.admin_id === currentAdmin.id).map(ji => ji.job_id);
+  return [...new Set([...ids1, ...ids2])];
+}
+
+function myAssignedDispatchPostingIds() {
+  return [...new Set(allDispatchJobInterviewers.filter(ji => ji.admin_id === currentAdmin.id).map(ji => ji.dispatch_posting_id))];
+}
+
+// 일반채용 todos + 파견직 todos를 항목 리스트까지 합쳐서 카운트와 목록 모두 통합
+// 각 항목에 _isDispatch 플래그를 심어서 렌더링 시 구분 가능하게 함
+function tagDispatch(arr, flag) { return arr.map(x => Object.assign({}, x, { _isDispatch: flag })); }
+
+function mergeTodos(t1, t2) {
+  return {
+    reviewNeeded: [...tagDispatch(t1.reviewNeeded,false), ...tagDispatch(t2.reviewNeeded,true)],
+    waitingSchedule: [...tagDispatch(t1.waitingSchedule,false), ...tagDispatch(t2.waitingSchedule,true)],
+    upcomingInterviews: [...tagDispatch(t1.upcomingInterviews,false), ...tagDispatch(t2.upcomingInterviews,true)],
+    decisionNeeded: [...tagDispatch(t1.decisionNeeded,false), ...tagDispatch(t2.decisionNeeded,true)],
+    totalApps: t1.totalApps + t2.totalApps
+  };
+}
+
 
 // ── 공고 ─────────────────────────────────────────────────
 async function loadJobs() {
@@ -1937,16 +2180,17 @@ async function toggleAdminActive(id, name, isActive) {
 }
 
 // ── 페이지 전환 ──────────────────────────────────────────
-function showPage(name, el) {
+function showPage(name, el, skipHistory) {
   if (adminProfile?.role !== 'superadmin' && ['candidates','stats'].includes(name)) {
     showToast('접근 권한이 없습니다');
     return;
   }
   document.querySelectorAll('.sb-link').forEach(l=>l.classList.remove('active'));
   if (el) el.classList.add('active');
-  ['Dashboard','Pipeline','Jobs','Candidates','Stats','Admins','Dispatch','DispatchDetail','DispatchAgencies','DispatchAdmins','Interviewroom','InterviewSession'].forEach(p=>
+  ['Home','Dashboard','Pipeline','Jobs','Candidates','Stats','Admins','Dispatch','DispatchDetail','DispatchAgencies','DispatchAdmins','Interviewroom','InterviewSession'].forEach(p=>
     document.getElementById('page'+p)?.classList.toggle('hidden', p.toLowerCase()!==name.toLowerCase())
   );
+  if(name==='home') loadHome();
   if(name==='admins') loadAdmins();
   if(name==='candidates') loadCandidates();
   if(name==='stats') loadStats();
@@ -1954,7 +2198,28 @@ function showPage(name, el) {
   if(name==='dispatchagencies') loadDispatchAgencies();
   if(name==='dispatchadmins') loadDispatchAdmins();
   if(name==='interviewroom') loadInterviewRoom();
+
+  // 브라우저 히스토리에 현재 페이지 기록 (뒤로가기/앞으로가기 지원)
+  if (!skipHistory) {
+    const hash = '#' + name;
+    if (location.hash !== hash) {
+      history.pushState({ page: name }, '', hash);
+    }
+  }
 }
+
+// 뒤로가기/앞으로가기 버튼 처리
+window.addEventListener('popstate', (e) => {
+  const name = (e.state && e.state.page) || (location.hash ? location.hash.slice(1) : 'home');
+  // 사이드바에서 해당 메뉴 버튼을 찾아 active 표시 맞춰주기 (없으면 null로 진행)
+  const btnMap = {
+    home: 'sbHome', dashboard: 'sbDashboard', interviewroom: null, jobs: null,
+    candidates: null, stats: null, admins: null, dispatch: 'dispatchMenu',
+    dispatchagencies: 'dispatchAgenciesMenuBtn', dispatchadmins: 'dispatchAdminsMenuBtn'
+  };
+  const btnId = btnMap[name];
+  showPage(name, btnId ? document.getElementById(btnId) : null, true);
+});
 
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
